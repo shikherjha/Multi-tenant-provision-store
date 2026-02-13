@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-operator
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: store-operator
+    {{- include "store-platform.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.operator.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: store-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: store-operator
+        {{- include "store-platform.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: store-operator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: operator
+          image: {{ .Values.operator.image | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DOMAIN_SUFFIX
+              value: {{ .Values.operator.domainSuffix | quote }}
+            - name: MAX_STORES
+              value: {{ .Values.operator.maxStores | quote }}
+            - name: PROVISION_TIMEOUT
+              value: {{ .Values.operator.provisionTimeout | quote }}
+            - name: MEDUSA_IMAGE
+              value: {{ .Values.operator.medusaImage | quote }}
+            - name: STOREFRONT_IMAGE
+              value: {{ .Values.operator.storefrontImage | quote }}
+            - name: STORAGE_CLASS
+              value: {{ .Values.operator.storageClass | quote }}
+            - name: INGRESS_CLASS
+              value: {{ .Values.operator.ingressClass | quote }}
+            - name: HELM_CHART_PATH
+              value: "/charts/store-medusa"
+          resources:
+            {{- toYaml .Values.operator.resources | nindent 12 }}

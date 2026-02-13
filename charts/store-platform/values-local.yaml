@@ -1,0 +1,19 @@
+# Local development overrides (Kind + Docker Desktop)
+namespace: store-platform
+
+operator:
+  domainSuffix: "local.urumi"
+  storageClass: "standard"
+  ingressClass: "nginx"
+  maxStores: 10
+  medusaImage: "medusa-store:latest"
+  storefrontImage: "store-storefront:latest"
+
+api:
+  domainSuffix: "local.urumi"
+  maxStoresPerOwner: 5
+  rateLimit: "20/minute"
+
+ingress:
+  dashboardHost: "dashboard.local.urumi"
+  apiHost: "api.local.urumi"

@@ -1,0 +1,58 @@
+# Platform-level defaults
+namespace: store-platform
+
+# --- Operator ---
+operator:
+  image: store-operator:latest
+  replicas: 1
+  domainSuffix: "local.urumi"
+  maxStores: 10
+  provisionTimeout: 300
+  medusaImage: "medusa-store:latest"
+  storefrontImage: "store-storefront:latest"
+  storageClass: "standard"
+  ingressClass: "nginx"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# --- Intent API ---
+api:
+  image: intent-api:latest
+  replicas: 1
+  port: 8080
+  domainSuffix: "local.urumi"
+  maxStoresPerOwner: 5
+  maxStoresGlobal: 10
+  rateLimit: "10/minute"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# --- Dashboard ---
+dashboard:
+  image: store-dashboard:latest
+  replicas: 1
+  port: 80
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
+# --- Ingress ---
+ingress:
+  enabled: true
+  className: "nginx"
+  dashboardHost: "dashboard.local.urumi"
+  apiHost: "api.local.urumi"

@@ -1,0 +1,256 @@
+{
+    "store": {
+        "currencies": [
+            "usd"
+        ]
+    },
+    "regions": [
+        {
+            "name": "NA",
+            "currency_code": "usd",
+            "tax_rate": 0,
+            "payment_providers": [
+                "manual"
+            ],
+            "fulfillment_providers": [
+                "manual"
+            ],
+            "countries": [
+                "us"
+            ]
+        }
+    ],
+    "products": [
+        {
+            "title": "Medusa Coffee Mug",
+            "subtitle": null,
+            "description": "A premium coffee mug from the Medusa store.",
+            "handle": "medusa-coffee-mug",
+            "is_giftcard": false,
+            "weight": 400,
+            "images": [],
+            "options": [
+                {
+                    "title": "Size",
+                    "values": [
+                        "Small",
+                        "Large"
+                    ]
+                }
+            ],
+            "variants": [
+                {
+                    "title": "Small",
+                    "prices": [
+                        {
+                            "currency_code": "usd",
+                            "amount": 1200
+                        }
+                    ],
+                    "options": [
+                        {
+                            "value": "Small"
+                        }
+                    ],
+                    "inventory_quantity": 100,
+                    "manage_inventory": true
+                },
+                {
+                    "title": "Large",
+                    "prices": [
+                        {
+                            "currency_code": "usd",
+                            "amount": 1800
+                        }
+                    ],
+                    "options": [
+                        {
+                            "value": "Large"
+                        }
+                    ],
+                    "inventory_quantity": 100,
+                    "manage_inventory": true
+                }
+            ]
+        },
+        {
+            "title": "Medusa T-Shirt",
+            "subtitle": null,
+            "description": "Comfortable cotton t-shirt with Medusa branding.",
+            "handle": "medusa-t-shirt",
+            "is_giftcard": false,
+            "weight": 200,
+            "images": [],
+            "options": [
+                {
+                    "title": "Size",
+                    "values": [
+                        "S",
+                        "M",
+                        "L",
+                        "XL"
+                    ]
+                }
+            ],
+            "variants": [
+                {
+                    "title": "S",
+                    "prices": [
+                        {
+                            "currency_code": "usd",
+                            "amount": 2500
+                        }
+                    ],
+                    "options": [
+                        {
+                            "value": "S"
+                        }
+                    ],
+                    "inventory_quantity": 50,
+                    "manage_inventory": true
+                },
+                {
+                    "title": "M",
+                    "prices": [
+                        {
+                            "currency_code": "usd",
+                            "amount": 2500
+                        }
+                    ],
+                    "options": [
+                        {
+                            "value": "M"
+                        }
+                    ],
+                    "inventory_quantity": 50,
+                    "manage_inventory": true
+                },
+                {
+                    "title": "L",
+                    "prices": [
+                        {
+                            "currency_code": "usd",
+                            "amount": 2500
+                        }
+                    ],
+                    "options": [
+                        {
+                            "value": "L"
+                        }
+                    ],
+                    "inventory_quantity": 50,
+                    "manage_inventory": true
+                },
+                {
+                    "title": "XL",
+                    "prices": [
+                        {
+                            "currency_code": "usd",
+                            "amount": 2500
+                        }
+                    ],
+                    "options": [
+                        {
+                            "value": "XL"
+                        }
+                    ],
+                    "inventory_quantity": 50,
+                    "manage_inventory": true
+                }
+            ]
+        },
+        {
+            "title": "Medusa Hoodie",
+            "subtitle": null,
+            "description": "Cozy hoodie for developers who ship fast.",
+            "handle": "medusa-hoodie",
+            "is_giftcard": false,
+            "weight": 500,
+            "images": [],
+            "options": [
+                {
+                    "title": "Size",
+                    "values": [
+                        "M",
+                        "L",
+                        "XL"
+                    ]
+                }
+            ],
+            "variants": [
+                {
+                    "title": "M",
+                    "prices": [
+                        {
+                            "currency_code": "usd",
+                            "amount": 4500
+                        }
+                    ],
+                    "options": [
+                        {
+                            "value": "M"
+                        }
+                    ],
+                    "inventory_quantity": 30,
+                    "manage_inventory": true
+                },
+                {
+                    "title": "L",
+                    "prices": [
+                        {
+                            "currency_code": "usd",
+                            "amount": 4500
+                        }
+                    ],
+                    "options": [
+                        {
+                            "value": "L"
+                        }
+                    ],
+                    "inventory_quantity": 30,
+                    "manage_inventory": true
+                },
+                {
+                    "title": "XL",
+                    "prices": [
+                        {
+                            "currency_code": "usd",
+                            "amount": 4500
+                        }
+                    ],
+                    "options": [
+                        {
+                            "value": "XL"
+                        }
+                    ],
+                    "inventory_quantity": 30,
+                    "manage_inventory": true
+                }
+            ]
+        }
+    ],
+    "shipping_options": [
+        {
+            "name": "Standard Shipping",
+            "region_name": "NA",
+            "data": {},
+            "price": 500,
+            "is_return": false,
+            "provider_id": "manual"
+        },
+        {
+            "name": "Express Shipping",
+            "region_name": "NA",
+            "data": {},
+            "price": 1500,
+            "is_return": false,
+            "provider_id": "manual"
+        }
+    ],
+    "users": [
+        {
+            "email": "admin@medusa-store.com",
+            "password": "supersecret"
+        }
+    ]
+}

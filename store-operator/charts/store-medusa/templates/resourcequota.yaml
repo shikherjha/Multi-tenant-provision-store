@@ -1,0 +1,17 @@
+{{- if .Values.resourceQuota.enabled }}
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: store-quota
+  labels:
+    {{- include "store-medusa.labels" . | nindent 4 }}
+spec:
+  hard:
+    pods: {{ .Values.resourceQuota.pods | quote }}
+    requests.cpu: {{ .Values.resourceQuota.requestsCpu | quote }}
+    requests.memory: {{ .Values.resourceQuota.requestsMemory | quote }}
+    limits.cpu: {{ .Values.resourceQuota.limitsCpu | quote }}
+    limits.memory: {{ .Values.resourceQuota.limitsMemory | quote }}
+    persistentvolumeclaims: {{ .Values.resourceQuota.pvcs | quote }}
+    requests.storage: {{ .Values.resourceQuota.storage | quote }}
+{{- end }}

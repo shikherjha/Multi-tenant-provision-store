@@ -1,0 +1,104 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: stores.platform.urumi.ai
+  annotations:
+    description: "Declarative store provisioning CRD for multi-tenant e-commerce platform"
+spec:
+  group: platform.urumi.ai
+  names:
+    plural: stores
+    singular: store
+    kind: Store
+    shortNames:
+      - st
+    categories:
+      - urumi
+  scope: Cluster
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: ["spec"]
+          properties:
+            spec:
+              type: object
+              required: ["engine"]
+              properties:
+                engine:
+                  type: string
+                  enum: ["medusa", "woocommerce"]
+                  description: "E-commerce engine to provision"
+                version:
+                  type: string
+                  default: "latest"
+                  description: "Engine version tag"
+                domainSuffix:
+                  type: string
+                  default: "local.urumi"
+                  description: "Domain suffix for store URL"
+                owner:
+                  type: string
+                  default: "default"
+                  description: "Owner/user identifier for quota tracking"
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: ["Pending", "Provisioning", "Ready", "Failed", "Deleting", "ComingSoon"]
+                url:
+                  type: string
+                adminUrl:
+                  type: string
+                message:
+                  type: string
+                createdAt:
+                  type: string
+                  format: date-time
+                lastUpdated:
+                  type: string
+                  format: date-time
+                retryCount:
+                  type: integer
+                  default: 0
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                        enum: ["True", "False", "Unknown"]
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Engine
+          type: string
+          jsonPath: .spec.engine
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: URL
+          type: string
+          jsonPath: .status.url
+          priority: 1
+        - name: Message
+          type: string
+          jsonPath: .status.message
+          priority: 1
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp

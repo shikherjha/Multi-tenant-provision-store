@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medusa Storefront</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a24;
+      --surface-hover: #23233a;
+      --border: #2a2a3e;
+      --primary: #7c3aed;
+      --primary-hover: #6d28d9;
+      --accent: #06d6a0;
+      --text: #e4e4e7;
+      --text-muted: #9ca3af;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --radius: 12px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    header {
+      background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(6,214,160,0.08));
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 2rem;
+      display: flex; justify-content: space-between; align-items: center;
+      backdrop-filter: blur(20px);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo { font-size: 1.5rem; font-weight: 700; }
+    .logo span { color: var(--primary); }
+    .cart-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 1.2rem;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .cart-btn:hover { background: var(--surface-hover); border-color: var(--primary); }
+    .cart-count {
+      position: absolute; top: -6px; right: -6px;
+      background: var(--primary); color: white;
+      border-radius: 50%; width: 20px; height: 20px;
+      font-size: 0.7rem; display: flex;
+      align-items: center; justify-content: center;
+    }
+    main { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    .subtitle { color: var(--text-muted); margin-bottom: 2rem; font-size: 1rem; }
+    .products { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
+    .product-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    .product-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--primary);
+      box-shadow: 0 8px 32px rgba(124,58,237,0.15);
+    }
+    .product-img {
+      height: 200px;
+      background: linear-gradient(135deg, var(--surface-hover), var(--border));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 3rem;
+    }
+    .product-info { padding: 1.2rem; }
+    .product-title { font-weight: 600; font-size: 1.1rem; margin-bottom: 0.4rem; }
+    .product-desc { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0.8rem; line-height: 1.5; }
+    .product-price { color: var(--accent); font-weight: 700; font-size: 1.2rem; margin-bottom: 0.8rem; }
+    .variant-select {
+      width: 100%; padding: 0.5rem;
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px;
+      margin-bottom: 0.8rem; font-size: 0.9rem;
+    }
+    .add-btn {
+      width: 100%; padding: 0.7rem;
+      background: var(--primary); color: white;
+      border: none; border-radius: 8px;
+      font-weight: 600; cursor: pointer;
+      transition: all 0.2s; font-size: 0.95rem;
+    }
+    .add-btn:hover { background: var(--primary-hover); }
+    .add-btn:active { transform: scale(0.97); }
+    .add-btn.added { background: var(--success); }
+
+    /* Cart Sidebar */
+    .cart-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6); z-index: 200;
+      display: none; backdrop-filter: blur(4px);
+    }
+    .cart-overlay.open { display: block; }
+    .cart-panel {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: 420px; max-width: 90vw;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      z-index: 201;
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      display: flex; flex-direction: column;
+    }
+    .cart-panel.open { transform: translateX(0); }
+    .cart-header {
+      padding: 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .cart-header h2 { font-size: 1.3rem; }
+    .close-btn {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 1.5rem; cursor: pointer;
+    }
+    .cart-items { flex: 1; overflow-y: auto; padding: 1rem; }
+    .cart-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1rem; border-bottom: 1px solid var(--border);
+    }
+    .cart-item-info { flex: 1; }
+    .cart-item-title { font-weight: 500; margin-bottom: 0.3rem; }
+    .cart-item-variant { color: var(--text-muted); font-size: 0.8rem; }
+    .cart-item-price { color: var(--accent); font-weight: 600; }
+    .remove-btn {
+      background: none; border: none; color: var(--danger);
+      cursor: pointer; font-size: 0.8rem; margin-left: 1rem;
+    }
+    .cart-footer {
+      padding: 1.5rem;
+      border-top: 1px solid var(--border);
+    }
+    .cart-total {
+      display: flex; justify-content: space-between;
+      font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem;
+    }
+    .checkout-btn {
+      width: 100%; padding: 0.9rem;
+      background: var(--accent); color: var(--bg);
+      border: none; border-radius: var(--radius);
+      font-weight: 700; font-size: 1rem;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .checkout-btn:hover { opacity: 0.9; }
+    .checkout-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .empty-cart { text-align: center; color: var(--text-muted); padding: 3rem; }
+
+    /* Checkout Form / Success */
+    .checkout-form { padding: 1.5rem; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; }
+    .form-group input, .form-group select {
+      width: 100%; padding: 0.6rem;
+      background: var(--bg); border: 1px solid var(--border);
+      color: var(--text); border-radius: 8px; font-size: 0.9rem;
+    }
+    .success-message {
+      text-align: center; padding: 3rem 1.5rem;
+    }
+    .success-icon { font-size: 4rem; margin-bottom: 1rem; }
+    .success-title { font-size: 1.5rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; }
+    .order-id { color: var(--text-muted); font-family: monospace; font-size: 0.9rem; }
+
+    .loading { text-align: center; padding: 4rem; color: var(--text-muted); }
+    .spinner {
+      border: 3px solid var(--border);
+      border-top: 3px solid var(--primary);
+      border-radius: 50%;
+      width: 40px; height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 640px) {
+      main { padding: 1rem; }
+      .products { grid-template-columns: 1fr; }
+      header { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo"><span>Medusa</span> Store</div>
+    <button class="cart-btn" onclick="toggleCart()">
+      🛒 Cart <span class="cart-count" id="cart-count">0</span>
+    </button>
+  </header>
+
+  <main>
+    <h1>Our Products</h1>
+    <p class="subtitle">Browse and shop from our curated collection</p>
+    <div id="products" class="products">
+      <div class="loading"><div class="spinner"></div>Loading products...</div>
+    </div>
+  </main>
+
+  <!-- Cart Sidebar -->
+  <div class="cart-overlay" id="cart-overlay" onclick="toggleCart()"></div>
+  <div class="cart-panel" id="cart-panel">
+    <div class="cart-header">
+      <h2>Shopping Cart</h2>
+      <button class="close-btn" onclick="toggleCart()">✕</button>
+    </div>
+    <div class="cart-items" id="cart-items"></div>
+    <div class="cart-footer" id="cart-footer"></div>
+  </div>
+
+  <script>
+    const API_BASE = window.MEDUSA_API_URL || '';
+    let cart = null;
+
+    // ---- Medusa Store API helpers ----
+    async function api(path, opts = {}) {
+      const res = await fetch(`${API_BASE}${path}`, {
+        headers: { 'Content-Type': 'application/json', ...opts.headers },
+        ...opts,
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      return res.json();
+    }
+
+    // ---- Products ----
+    async function loadProducts() {
+      try {
+        const { products } = await api('/store/products');
+        const container = document.getElementById('products');
+        if (!products.length) {
+          container.innerHTML = '<p class="loading">No products available yet. Store may still be seeding.</p>';
+          return;
+        }
+        const emojis = ['☕', '👕', '🧥', '🎒', '🧢', '👟'];
+        container.innerHTML = products.map((p, i) => `
+          <div class="product-card">
+            <div class="product-img">${emojis[i % emojis.length]}</div>
+            <div class="product-info">
+              <div class="product-title">${p.title}</div>
+              <div class="product-desc">${p.description || ''}</div>
+              <div class="product-price">$${(p.variants[0]?.prices[0]?.amount / 100).toFixed(2)}</div>
+              <select class="variant-select" id="variant-${p.id}">
+                ${p.variants.map(v => `<option value="${v.id}">${v.title} — $${(v.prices[0]?.amount / 100).toFixed(2)}</option>`).join('')}
+              </select>
+              <button class="add-btn" onclick="addToCart('${p.id}')">Add to Cart</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (e) {
+        document.getElementById('products').innerHTML =
+          `<p class="loading">Unable to load products. The store may still be starting up.<br><br><small>${e.message}</small></p>`;
+      }
+    }
+
+    // ---- Cart Operations ----
+    async function ensureCart() {
+      if (cart) return cart;
+      const stored = localStorage.getItem('cart_id');
+      if (stored) {
+        try {
+          const data = await api(`/store/carts/${stored}`);
+          cart = data.cart;
+          return cart;
+        } catch (e) { localStorage.removeItem('cart_id'); }
+      }
+      const data = await api('/store/carts', { method: 'POST', body: JSON.stringify({}) });
+      cart = data.cart;
+      localStorage.setItem('cart_id', cart.id);
+      return cart;
+    }
+
+    async function addToCart(productId) {
+      const btn = event.target;
+      try {
+        btn.textContent = 'Adding...';
+        btn.disabled = true;
+        const c = await ensureCart();
+        const variantId = document.getElementById(`variant-${productId}`).value;
+        const data = await api(`/store/carts/${c.id}/line-items`, {
+          method: 'POST',
+          body: JSON.stringify({ variant_id: variantId, quantity: 1 }),
+        });
+        cart = data.cart;
+        updateCartUI();
+        btn.textContent = '✓ Added!';
+        btn.classList.add('added');
+        setTimeout(() => { btn.textContent = 'Add to Cart'; btn.classList.remove('added'); btn.disabled = false; }, 1500);
+      } catch (e) {
+        btn.textContent = 'Error';
+        setTimeout(() => { btn.textContent = 'Add to Cart'; btn.disabled = false; }, 2000);
+      }
+    }
+
+    async function removeFromCart(itemId) {
+      if (!cart) return;
+      const data = await api(`/store/carts/${cart.id}/line-items/${itemId}`, { method: 'DELETE' });
+      cart = data.cart;
+      updateCartUI();
+    }
+
+    function toggleCart() {
+      document.getElementById('cart-overlay').classList.toggle('open');
+      document.getElementById('cart-panel').classList.toggle('open');
+      updateCartUI();
+    }
+
+    function updateCartUI() {
+      const count = cart?.items?.length || 0;
+      document.getElementById('cart-count').textContent = count;
+      const itemsDiv = document.getElementById('cart-items');
+      const footerDiv = document.getElementById('cart-footer');
+
+      if (!cart || !cart.items?.length) {
+        itemsDiv.innerHTML = '<div class="empty-cart">Your cart is empty</div>';
+        footerDiv.innerHTML = '';
+        return;
+      }
+
+      itemsDiv.innerHTML = cart.items.map(item => `
+        <div class="cart-item">
+          <div class="cart-item-info">
+            <div class="cart-item-title">${item.title}</div>
+            <div class="cart-item-variant">${item.description} × ${item.quantity}</div>
+            <div class="cart-item-price">$${(item.total / 100).toFixed(2)}</div>
+          </div>
+          <button class="remove-btn" onclick="removeFromCart('${item.id}')">Remove</button>
+        </div>
+      `).join('');
+
+      footerDiv.innerHTML = `
+        <div class="cart-total"><span>Total</span><span>$${(cart.total / 100).toFixed(2)}</span></div>
+        <button class="checkout-btn" onclick="startCheckout()">Proceed to Checkout</button>
+      `;
+    }
+
+    // ---- Checkout ----
+    async function startCheckout() {
+      const footerDiv = document.getElementById('cart-footer');
+      const itemsDiv = document.getElementById('cart-items');
+      itemsDiv.innerHTML = `
+        <div class="checkout-form">
+          <h3 style="margin-bottom:1rem">Shipping Details</h3>
+          <div class="form-group"><label>First Name</label><input id="co-first" value="John"></div>
+          <div class="form-group"><label>Last Name</label><input id="co-last" value="Doe"></div>
+          <div class="form-group"><label>Email</label><input id="co-email" type="email" value="john@example.com"></div>
+          <div class="form-group"><label>Address</label><input id="co-addr" value="123 Main St"></div>
+          <div class="form-group"><label>City</label><input id="co-city" value="New York"></div>
+          <div class="form-group"><label>Country Code</label><input id="co-country" value="us"></div>
+          <div class="form-group"><label>Postal Code</label><input id="co-zip" value="10001"></div>
+        </div>
+      `;
+      footerDiv.innerHTML = `
+        <button class="checkout-btn" onclick="completeCheckout()">Complete Order (Manual Payment)</button>
+      `;
+    }
+
+    async function completeCheckout() {
+      const btn = document.querySelector('.checkout-btn');
+      btn.textContent = 'Processing...';
+      btn.disabled = true;
+      try {
+        // Step 1: Update cart with customer info
+        await api(`/store/carts/${cart.id}`, {
+          method: 'POST',
+          body: JSON.stringify({
+            email: document.getElementById('co-email').value,
+            shipping_address: {
+              first_name: document.getElementById('co-first').value,
+              last_name: document.getElementById('co-last').value,
+              address_1: document.getElementById('co-addr').value,
+              city: document.getElementById('co-city').value,
+              country_code: document.getElementById('co-country').value,
+              postal_code: document.getElementById('co-zip').value,
+            },
+          }),
+        });
+
+        // Step 2: Add shipping method (first available)
+        const { shipping_options } = await api(`/store/shipping-options/${cart.id}`);
+        if (shipping_options.length) {
+          await api(`/store/carts/${cart.id}/shipping-methods`, {
+            method: 'POST',
+            body: JSON.stringify({ option_id: shipping_options[0].id }),
+          });
+        }
+
+        // Step 3: Create payment sessions
+        await api(`/store/carts/${cart.id}/payment-sessions`, { method: 'POST' });
+
+        // Step 4: Select manual payment
+        await api(`/store/carts/${cart.id}/payment-session`, {
+          method: 'POST',
+          body: JSON.stringify({ provider_id: 'manual' }),
+        });
+
+        // Step 5: Complete the order
+        const { type, data } = await api(`/store/carts/${cart.id}/complete`, { method: 'POST' });
+
+        if (type === 'order') {
+          showOrderSuccess(data);
+        } else {
+          throw new Error('Order completion returned unexpected type: ' + type);
+        }
+      } catch (e) {
+        btn.textContent = 'Retry Order';
+        btn.disabled = false;
+        alert('Checkout failed: ' + e.message);
+      }
+    }
+
+    function showOrderSuccess(order) {
+      const itemsDiv = document.getElementById('cart-items');
+      const footerDiv = document.getElementById('cart-footer');
+      itemsDiv.innerHTML = `
+        <div class="success-message">
+          <div class="success-icon">🎉</div>
+          <div class="success-title">Order Placed!</div>
+          <p style="margin-bottom:0.5rem">Your order has been created successfully.</p>
+          <p class="order-id">Order ID: ${order.display_id || order.id}</p>
+          <p style="margin-top:1rem;color:var(--text-muted);font-size:0.85rem">
+            Check the Medusa Admin panel to view this order.
+          </p>
+        </div>
+      `;
+      footerDiv.innerHTML = `
+        <button class="checkout-btn" onclick="resetAfterOrder()">Continue Shopping</button>
+      `;
+      cart = null;
+      localStorage.removeItem('cart_id');
+    }
+
+    function resetAfterOrder() {
+      toggleCart();
+      updateCartUI();
+    }
+
+    // ---- Init ----
+    loadProducts();
+  </script>
+</body>
+</html>

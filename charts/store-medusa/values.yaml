@@ -1,0 +1,78 @@
+# Per-store Medusa deployment values
+storeName: "my-store"
+
+# --- PostgreSQL ---
+postgres:
+  image: postgres:15-alpine
+  password: "medusa-pg-pass"
+  database: "medusa"
+  user: "medusa"
+  storageClass: "standard"
+  storageSize: "2Gi"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+# --- Medusa Backend ---
+medusa:
+  image: "medusa-store:latest"
+  replicas: 1
+  port: 9000
+  adminEmail: "admin@medusa-store.com"
+  adminPassword: "supersecret"
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+# --- Storefront ---
+storefront:
+  image: "store-storefront:latest"
+  replicas: 1
+  port: 8000
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
+# --- Ingress ---
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "my-store.local.urumi"
+  tls: false
+
+# --- Isolation (ResourceQuota) ---
+resourceQuota:
+  enabled: true
+  pods: "10"
+  requestsCpu: "2"
+  requestsMemory: "3Gi"
+  limitsCpu: "4"
+  limitsMemory: "4Gi"
+  pvcs: "3"
+  storage: "10Gi"
+
+# --- LimitRange ---
+limitRange:
+  enabled: true
+  defaultCpu: "200m"
+  defaultMemory: "256Mi"
+  defaultRequestCpu: "100m"
+  defaultRequestMemory: "128Mi"
+  maxCpu: "1"
+  maxMemory: "1Gi"
+
+# --- NetworkPolicy ---
+networkPolicy:
+  enabled: true

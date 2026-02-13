@@ -1,0 +1,16 @@
+node_modules/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.egg-info/
+dist/
+build/
+.next/
+.vite/
+*.log
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
