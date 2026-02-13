@@ -6,30 +6,7 @@ The platform follows a **declarative, intent-based architecture** where the Stor
 is the single source of truth. Users express *intent* ("create a MedusaJS store"), and
 the Kubernetes operator *reconciles* that intent into running infrastructure.
 
-```
-┌─────────────┐   REST/WS    ┌─────────────┐   K8s API    ┌──────────────┐
-│  Dashboard   │────────────▶│  Intent API  │────────────▶│  Store CRD   │
-│  (React)     │◀────────────│  (FastAPI)   │             │  (K8s CR)    │
-└─────────────┘   WebSocket  └──────┬───────┘             └──────┬───────┘
-                                    │ Prometheus                 │ Watch
-                                    │ /metrics                   │
-                              ┌─────┴─────┐              ┌──────┴───────┐
-                              │   Redis    │◀─────────────│   Operator   │
-                              │  (Streams) │   Events     │  (kopf)      │
-                              └───────────┘              └──────┬───────┘
-                                                                │ Helm
-                                                         ┌──────┴───────┐
-                                                         │ store-{name} │
-                                                         │  Namespace   │
-                                                         │ ┌──────────┐ │
-                                                         │ │PostgreSQL│ │
-                                                         │ │ Backend  │ │
-                                                         │ │Storefront│ │
-                                                         │ │NetworkPol│ │
-                                                         │ │ Quota    │ │
-                                                         │ └──────────┘ │
-                                                         └──────────────┘
-```
+![Architecture](./component%20view.png)
 
 ## Component Responsibilities
 

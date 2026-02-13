@@ -1,4 +1,5 @@
 # Store Provisioning Platform
+**[WATCH THE DEMO VIDEO](https://drive.google.com/file/d/1UfHGKHhVLVN56UNvD9bNlBog8O6DZEyv/view?usp=sharing)**
 
 **Kubernetes-native multi-tenant e-commerce store provisioning platform** using a CRD-based Operator pattern with production-grade control plane enhancements.
 
@@ -8,6 +9,8 @@
 Dashboard (React) → Intent API (FastAPI) → Store CRD → Operator (kopf) → K8s Resources
      ↕ WebSocket           ↕ Redis Streams         ↕ Watch
 ```
+
+![Control Plane Architecture](./Control%20plane%20architecture.png)
 
 Each store gets an **isolated namespace** with: PostgreSQL + MedusaJS Backend + Storefront + Ingress + NetworkPolicy + ResourceQuota + LimitRange.
 
