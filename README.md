@@ -5,10 +5,7 @@
 
 ## Architecture
 
-```
-Dashboard (React) → Intent API (FastAPI) → Store CRD → Operator (kopf) → K8s Resources
-     ↕ WebSocket           ↕ Redis Streams         ↕ Watch
-```
+![Component Architecture](./component%20view.png)
 
 ![Control Plane Architecture](./Control%20plane%20architecture.png)
 
