@@ -1,6 +1,19 @@
 # Platform-level defaults
 namespace: store-platform
 
+# --- Redis (shared by operator + API for real-time event streaming) ---
+redis:
+  enabled: true
+  image: redis:7-alpine
+  port: 6379
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
 # --- Operator ---
 operator:
   image: store-operator:latest
@@ -12,6 +25,7 @@ operator:
   storefrontImage: "store-storefront:latest"
   storageClass: "standard"
   ingressClass: "nginx"
+  maxParallelProvisions: 3
   resources:
     requests:
       cpu: "100m"
@@ -56,3 +70,7 @@ ingress:
   className: "nginx"
   dashboardHost: "dashboard.local.urumi"
   apiHost: "api.local.urumi"
+
+# --- NetworkPolicy (configurable ingress controller label) ---
+networkPolicy:
+  ingressControllerLabel: "app.kubernetes.io/name: ingress-nginx"

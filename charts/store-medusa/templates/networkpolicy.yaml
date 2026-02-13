@@ -1,5 +1,19 @@
+{{/*
+NetworkPolicies for store isolation.
+
+Defense-in-depth model:
+  1. Default deny ALL ingress
+  2. Allow ingress controller → storefront + medusa-backend
+  3. Allow storefront → medusa-backend (internal proxy)
+  4. Allow medusa-backend → postgres (database access)
+
+The ingress controller label is configurable via values to support:
+  - Nginx (Kind/local):   app.kubernetes.io/name: ingress-nginx
+  - Traefik (k3s/prod):   app.kubernetes.io/name: traefik
+*/}}
+
 {{- if .Values.networkPolicy.enabled }}
-# Default deny all ingress traffic
+# --- Default deny all ingress ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -11,11 +25,11 @@ spec:
   policyTypes:
     - Ingress
 ---
-# Allow ingress from nginx ingress controller to storefront + medusa
+# --- Allow ingress controller → storefront + medusa-backend ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: allow-ingress-controller
+  name: allow-ingress-to-services
   labels:
     {{- include "store-medusa.labels" . | nindent 4 }}
 spec:
@@ -23,23 +37,22 @@ spec:
     matchExpressions:
       - key: app.kubernetes.io/name
         operator: In
-        values:
-          - medusa-backend
-          - storefront
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
-      ports:
-        - protocol: TCP
-          port: 9000
-        - protocol: TCP
-          port: 8000
+        values: ["storefront", "medusa-backend"]
   policyTypes:
     - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingressControllerSelector | nindent 14 }}
+      ports:
+        - port: 8000
+          protocol: TCP
+        - port: 9000
+          protocol: TCP
 ---
-# Allow storefront to reach medusa-backend
+# --- Allow storefront → medusa-backend ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -50,18 +63,18 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: medusa-backend
+  policyTypes:
+    - Ingress
   ingress:
     - from:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: storefront
       ports:
-        - protocol: TCP
-          port: 9000
-  policyTypes:
-    - Ingress
+        - port: 9000
+          protocol: TCP
 ---
-# Allow medusa-backend to reach postgres
+# --- Allow medusa-backend → postgres ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -72,14 +85,14 @@ spec:
   podSelector:
     matchLabels:
       app.kubernetes.io/name: postgres
+  policyTypes:
+    - Ingress
   ingress:
     - from:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: medusa-backend
       ports:
-        - protocol: TCP
-          port: 5432
-  policyTypes:
-    - Ingress
+        - port: 5432
+          protocol: TCP
 {{- end }}

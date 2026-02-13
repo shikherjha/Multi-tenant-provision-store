@@ -1,12 +1,16 @@
 # Production overrides (VPS / k3s)
 namespace: store-platform
 
+redis:
+  enabled: true
+
 operator:
   domainSuffix: "stores.yourvps.com"
   storageClass: "local-path"          # k3s default
   ingressClass: "traefik"             # k3s ships with Traefik
   maxStores: 50
   provisionTimeout: 600
+  maxParallelProvisions: 3
   medusaImage: "registry.yourvps.com/medusa-store:latest"
   storefrontImage: "registry.yourvps.com/store-storefront:latest"
 
@@ -17,5 +21,6 @@ api:
   rateLimit: "30/minute"
 
 ingress:
+  className: "traefik"
   dashboardHost: "dashboard.yourvps.com"
   apiHost: "api.yourvps.com"

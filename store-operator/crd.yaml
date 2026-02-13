@@ -82,6 +82,19 @@ spec:
                       lastTransitionTime:
                         type: string
                         format: date-time
+                activityLog:
+                  type: array
+                  description: "Ring buffer of recent provisioning events (max 15)"
+                  items:
+                    type: object
+                    properties:
+                      timestamp:
+                        type: string
+                        format: date-time
+                      event:
+                        type: string
+                      message:
+                        type: string
       subresources:
         status: {}
       additionalPrinterColumns:

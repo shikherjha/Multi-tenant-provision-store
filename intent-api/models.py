@@ -1,6 +1,7 @@
 """
-Pydantic models for API request/response validation.
+Pydantic models for the Intent API request/response schemas.
 """
+
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from enum import Enum
@@ -8,51 +9,45 @@ from datetime import datetime
 
 
 class EngineType(str, Enum):
-    MEDUSA = "medusa"
-    WOOCOMMERCE = "woocommerce"
+    medusa = "medusa"
+    woocommerce = "woocommerce"
 
 
 class StoreCreateRequest(BaseModel):
-    """Request to create a new store."""
-    name: str = Field(
-        ...,
-        min_length=3,
-        max_length=30,
-        pattern=r"^[a-z][a-z0-9-]*[a-z0-9]$",
-        description="Store name (lowercase, alphanumeric with hyphens, 3-30 chars)",
-        examples=["my-store", "demo-shop"],
-    )
-    engine: EngineType = Field(
-        default=EngineType.MEDUSA,
-        description="E-commerce engine (medusa or woocommerce)",
-    )
-    owner: str = Field(
-        default="default",
-        max_length=50,
-        description="Owner identifier for quota tracking",
-    )
+    name: str = Field(..., min_length=2, max_length=40, pattern=r"^[a-z][a-z0-9-]*[a-z0-9]$",
+                      description="Store name (lowercase, alphanumeric, hyphens)")
+    engine: EngineType = Field(default=EngineType.medusa, description="E-commerce engine")
+    owner: str = Field(default="default", min_length=1, max_length=60,
+                       description="Owner identifier")
 
 
 class StoreCondition(BaseModel):
     type: str
-    status: str
+    status: str  # "True", "False", "Unknown"
     reason: str = ""
     message: str = ""
     lastTransitionTime: Optional[str] = None
 
 
+class ActivityLogEntry(BaseModel):
+    timestamp: str
+    event: str
+    message: str
+
+
 class StoreResponse(BaseModel):
-    """Store details returned to the dashboard."""
     name: str
     engine: str
+    owner: str
     phase: str = "Pending"
     url: Optional[str] = None
     adminUrl: Optional[str] = None
-    message: Optional[str] = None
+    message: str = ""
     createdAt: Optional[str] = None
     lastUpdated: Optional[str] = None
-    owner: str = "default"
+    retryCount: int = 0
     conditions: List[StoreCondition] = []
+    activityLog: List[ActivityLogEntry] = []
 
 
 class StoreListResponse(BaseModel):
@@ -62,14 +57,27 @@ class StoreListResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
-    code: str = "UNKNOWN_ERROR"
 
 
 class AuditLogEntry(BaseModel):
     timestamp: str
-    action: str  # CREATE, DELETE
+    action: str
     store_name: str
     engine: str
     owner: str
-    result: str  # SUCCESS, FAILED
+    result: str
     detail: str = ""
+
+
+class HealthResponse(BaseModel):
+    status: str
+    timestamp: str
+    redis: str = "disabled"
+    stores_total: int = 0
+
+
+class MetricsInfo(BaseModel):
+    stores_total: int
+    stores_ready: int
+    stores_failed: int
+    stores_provisioning: int

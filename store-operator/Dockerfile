@@ -24,7 +24,10 @@ COPY operator.py .
 COPY charts/ /charts/
 
 # Non-root user for security hardening
-RUN groupadd -r operator 2>/dev/null || true && useradd -r -g operator operator 2>/dev/null || true
-USER operator
+RUN (getent group operator && groupdel operator || true) && \
+    (id operator && userdel operator || true) && \
+    groupadd -r operator && useradd -r -g operator -u 1000 -m operator
+ENV USER=operator
+USER 1000
 
 ENTRYPOINT ["kopf", "run", "operator.py", "--verbose", "--all-namespaces"]

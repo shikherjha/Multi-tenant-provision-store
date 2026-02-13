@@ -1,14 +1,27 @@
-# Per-store Medusa deployment values
-storeName: "my-store"
+# Per-store Helm chart values (defaults — overridden by operator at install time)
+storeName: ""
 
 # --- PostgreSQL ---
 postgres:
-  image: postgres:15-alpine
-  password: "medusa-pg-pass"
-  database: "medusa"
-  user: "medusa"
-  storageClass: "standard"
-  storageSize: "2Gi"
+  image: postgres:16-alpine
+  user: medusa
+  password: medusa-secret
+  database: medusa
+  storageClass: standard
+  storageSize: 1Gi
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# --- Medusa Backend ---
+medusa:
+  image: medusa-store:latest
+  replicas: 1
+  port: 9000
   resources:
     requests:
       cpu: "100m"
@@ -17,24 +30,9 @@ postgres:
       cpu: "500m"
       memory: "512Mi"
 
-# --- Medusa Backend ---
-medusa:
-  image: "medusa-store:latest"
-  replicas: 1
-  port: 9000
-  adminEmail: "admin@medusa-store.com"
-  adminPassword: "supersecret"
-  resources:
-    requests:
-      cpu: "200m"
-      memory: "512Mi"
-    limits:
-      cpu: "1000m"
-      memory: "1Gi"
-
 # --- Storefront ---
 storefront:
-  image: "store-storefront:latest"
+  image: store-storefront:latest
   replicas: 1
   port: 8000
   resources:
@@ -48,31 +46,37 @@ storefront:
 # --- Ingress ---
 ingress:
   enabled: true
-  className: "nginx"
-  host: "my-store.local.urumi"
+  className: nginx
+  host: ""
   tls: false
 
-# --- Isolation (ResourceQuota) ---
+# --- Resource Quota (per-store namespace) ---
 resourceQuota:
   enabled: true
   pods: "10"
   requestsCpu: "2"
-  requestsMemory: "3Gi"
+  requestsMemory: "2Gi"
   limitsCpu: "4"
   limitsMemory: "4Gi"
   pvcs: "3"
-  storage: "10Gi"
+  storage: "5Gi"
 
-# --- LimitRange ---
+# --- Limit Range (per-container defaults) ---
 limitRange:
   enabled: true
-  defaultCpu: "200m"
+  defaultCpu: "250m"
   defaultMemory: "256Mi"
   defaultRequestCpu: "100m"
   defaultRequestMemory: "128Mi"
   maxCpu: "1"
   maxMemory: "1Gi"
 
-# --- NetworkPolicy ---
+# --- Network Policy ---
 networkPolicy:
   enabled: true
+  # Configurable ingress controller selector
+  # For Nginx (Kind/local):
+  ingressControllerSelector:
+    app.kubernetes.io/name: ingress-nginx
+  # For Traefik (k3s/prod), override with:
+  #   app.kubernetes.io/name: traefik

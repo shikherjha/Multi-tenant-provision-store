@@ -14,18 +14,18 @@ cd "$PROJECT_DIR"
 
 # 1. Build Medusa Store image
 echo ""
-echo "[1/4] Building medusa-store image..."
+echo "[1/5] Building medusa-store image..."
 docker build -t medusa-store:latest ./docker/medusa/
 
 # 2. Build Storefront image
 echo ""
-echo "[2/4] Building store-storefront image..."
+echo "[2/5] Building store-storefront image..."
 docker build -t store-storefront:latest ./docker/storefront/
 
 # 3. Build Operator image
 echo ""
-echo "[3/4] Building store-operator image..."
-# Copy charts into operator build context
+echo "[3/5] Building store-operator image..."
+# Copy charts into operator build context (operator bundles its own Helm charts)
 mkdir -p store-operator/charts
 cp -r charts/store-medusa store-operator/charts/
 docker build -t store-operator:latest ./store-operator/
@@ -33,15 +33,20 @@ rm -rf store-operator/charts
 
 # 4. Build Intent API image
 echo ""
-echo "[4/4] Building intent-api image..."
+echo "[4/5] Building intent-api image..."
 docker build -t intent-api:latest ./intent-api/
+
+# 5. Build Dashboard image
+echo ""
+echo "[5/5] Building dashboard image..."
+docker build -t store-dashboard:latest ./dashboard/
 
 echo ""
 echo "============================================"
 echo "  Loading Images into Kind Cluster"
 echo "============================================"
 
-for img in medusa-store:latest store-storefront:latest store-operator:latest intent-api:latest; do
+for img in medusa-store:latest store-storefront:latest store-operator:latest intent-api:latest store-dashboard:latest; do
   echo "Loading $img..."
   kind load docker-image "$img" --name "$CLUSTER_NAME"
 done

@@ -7,7 +7,7 @@ metadata:
   labels:
     {{- include "store-platform.labels" . | nindent 4 }}
 ---
-# --- Operator ClusterRole (least privilege) ---
+# --- Operator ClusterRole (Helm needs broad access to store namespaces) ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -21,21 +21,30 @@ rules:
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list", "create", "delete"]
-  # Read pods for health checks
+  # Core resources created by Helm chart in store namespaces
   - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list", "watch"]
-  # Emit events for observability
+    resources: ["pods", "services", "configmaps", "secrets", "persistentvolumeclaims", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Events for observability
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["create", "patch"]
+  # Resource management in store namespaces
+  - apiGroups: [""]
+    resources: ["resourcequotas", "limitranges"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  # Workload resources (Helm creates these)
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Networking (NetworkPolicy + Ingress)
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies", "ingresses"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
   # Kopf internal storage
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
     verbs: ["list", "watch", "get"]
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    verbs: ["get", "list", "watch", "create", "update", "patch"]
   # Kopf needs to manage leases for leader election
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]

@@ -43,5 +43,11 @@ spec:
               value: {{ .Values.operator.ingressClass | quote }}
             - name: HELM_CHART_PATH
               value: "/charts/store-medusa"
+            - name: MAX_PARALLEL_PROVISIONS
+              value: {{ .Values.operator.maxParallelProvisions | default 3 | quote }}
+            {{- if .Values.redis.enabled }}
+            - name: REDIS_URL
+              value: "redis://redis.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.redis.port }}"
+            {{- end }}
           resources:
             {{- toYaml .Values.operator.resources | nindent 12 }}

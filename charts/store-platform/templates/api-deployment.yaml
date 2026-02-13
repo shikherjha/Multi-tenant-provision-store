@@ -41,6 +41,10 @@ spec:
               value: {{ .Values.api.maxStoresGlobal | quote }}
             - name: RATE_LIMIT
               value: {{ .Values.api.rateLimit | quote }}
+            {{- if .Values.redis.enabled }}
+            - name: REDIS_URL
+              value: "redis://redis.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.redis.port }}"
+            {{- end }}
           resources:
             {{- toYaml .Values.api.resources | nindent 12 }}
           readinessProbe:

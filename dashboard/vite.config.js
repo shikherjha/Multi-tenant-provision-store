@@ -6,9 +6,15 @@ export default defineConfig({
     server: {
         port: 3000,
         proxy: {
+            '/api/stores/ws': {
+                target: 'ws://localhost:8080',
+                ws: true,
+                rewrite: (path) => path.replace(/^\/api/, ''),
+            },
             '/api': {
                 target: 'http://localhost:8080',
                 changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api/, ''),
             },
         },
     },
