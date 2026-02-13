@@ -68,7 +68,8 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # --- Include stores router ---
-app.include_router(stores_router)
+# --- Include stores router ---
+app.include_router(stores_router, prefix="/api")
 
 
 # --- Health check ---
