@@ -108,10 +108,7 @@ kopf run operator.py --verbose
 
 The dashboard shows a visual pipeline for each store:
 
-```
-[✓ Namespace] ─── [✓ Helm] ─── [✓ Database] ─── [◉ Backend] ─── [○ Storefront]
-                                                     ↑ active step
-```
+![Provisioning Pipeline](./UI_snapshot.jpeg)
 
 Each step maps to a CRD status condition. Failed steps show the error message.
 The activity log panel shows all events with timestamps.
