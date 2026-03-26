@@ -10,6 +10,8 @@ operator:
   ingressClass: "nginx"
   maxStores: 10
   maxParallelProvisions: 3
+  # Backend mode: "lite" (fast, lightweight) or "full" (real MedusaJS v2)
+  # Switch by setting: --set operator.medusaImage=medusa-store:full
   medusaImage: "medusa-store:latest"
   storefrontImage: "store-storefront:latest"
 

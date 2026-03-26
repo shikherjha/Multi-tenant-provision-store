@@ -1,20 +1,40 @@
-FROM nginx:1.25-alpine
+FROM node:20-alpine AS builder
 
-# Security: remove default configs
-RUN rm -rf /etc/nginx/conf.d/*
+WORKDIR /app
 
-# Copy storefront files
-COPY index.html /usr/share/nginx/html/
+COPY package.json yarn.lock ./
 
-# Copy nginx template config (uses envsubst for backend URL)
-COPY nginx.conf /etc/nginx/templates/default.conf.template
+COPY . .
 
-# Non-root user (nginx alpine already runs worker as nginx user)
-# Expose storefront port
+# Bypass the NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY check for build
+RUN echo "module.exports = function() {}" > check-env-variables.js
+
+RUN corepack enable && corepack prepare yarn@4.12.0 --activate
+RUN yarn install
+
+ENV NEXT_PUBLIC_MEDUSA_BACKEND_URL=http://medusa-backend:9000
+ENV NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY=pk_dummy
+ENV NEXT_PUBLIC_BASE_URL=http://localhost:8000
+ENV MEDUSA_BACKEND_URL=http://medusa-backend:9000
+ENV STANDALONE_BUILD=true
+
+RUN yarn build
+
+FROM node:20-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV production
+
+# You only need these copied for standalone execution
+COPY --from=builder /app/package.json ./package.json
+
+# Automatically leverage output traces to reduce image size
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
+
+# Expose port and start
 EXPOSE 8000
+ENV PORT=8000
 
-# nginx uses envsubst to replace ${MEDUSA_BACKEND_URL} at startup
-ENV MEDUSA_BACKEND_URL=medusa-backend:9000
-
-HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
-    CMD wget -q --spider http://localhost:8000/healthz || exit 1
+CMD ["node", "server.js"]

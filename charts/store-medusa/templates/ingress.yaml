@@ -44,6 +44,20 @@ spec:
                 name: medusa-backend
                 port:
                   number: 9000
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: medusa-backend
+                port:
+                  number: 9000
+          - path: /static
+            pathType: Prefix
+            backend:
+              service:
+                name: medusa-backend
+                port:
+                  number: 9000
           # Storefront (default route)
           - path: /
             pathType: Prefix

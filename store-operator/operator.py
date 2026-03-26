@@ -573,6 +573,22 @@ def reconcile_store(spec, name, status, patch, logger, **kwargs):
             "ingress.className": INGRESS_CLASS,
             "postgres.storageClass": STORAGE_CLASS,
         }
+
+        # Full MedusaJS v2 needs longer startup (migrations + admin build + seed)
+        is_full_medusa = "full" in MEDUSA_IMAGE.lower() or "medusajs" in MEDUSA_IMAGE.lower()
+        if is_full_medusa:
+            logger.info(f"[{name}] Full MedusaJS mode — adjusting probe timings & resources")
+            helm_values.update({
+                "medusa.readinessInitialDelay": "60",
+                "medusa.livenessInitialDelay": "120",
+                "medusa.startupInitialDelay": "30",
+                "medusa.startupFailureThreshold": "60",
+                "medusa.resources.requests.memory": "512Mi",
+                "medusa.resources.limits.memory": "1Gi",
+                "medusa.resources.requests.cpu": "250m",
+                "medusa.resources.limits.cpu": "1",
+            })
+
         helm_install(name, store_ns, helm_values)
         set_condition(conditions, "HelmInstalled", "True", "Installed",
                       "Helm chart installed successfully")
@@ -776,13 +792,29 @@ def check_store_health(spec, name, status, patch, logger, **kwargs):
             _publish_event(name, "SELF_HEAL", "Self-healing via Helm upgrade", "Ready")
 
             helm_values = {
-                "storeName": name,
-                "medusa.image": MEDUSA_IMAGE,
-                "storefront.image": STOREFRONT_IMAGE,
-                "ingress.host": f"{name}.{domain_suffix}",
-                "ingress.className": INGRESS_CLASS,
-                "postgres.storageClass": STORAGE_CLASS,
+            "storeName": name,
+            "medusa.image": MEDUSA_IMAGE,
+            "storefront.image": STOREFRONT_IMAGE,
+            "ingress.host": f"{name}.{domain_suffix}",
+            "ingress.className": INGRESS_CLASS,
+            "postgres.storageClass": STORAGE_CLASS,
             }
+
+            # Full MedusaJS v2 needs longer startup (migrations + admin build + seed)
+            is_full_medusa = "full" in MEDUSA_IMAGE.lower() or "medusajs" in MEDUSA_IMAGE.lower()
+            if is_full_medusa:
+                logger.info(f"[{name}] Full MedusaJS mode — adjusting probe timings & resources")
+                helm_values.update({
+                    "medusa.readinessInitialDelay": "60",
+                    "medusa.livenessInitialDelay": "120",
+                    "medusa.startupInitialDelay": "30",
+                    "medusa.startupFailureThreshold": "60",
+                    "medusa.resources.requests.memory": "512Mi",
+                    "medusa.resources.limits.memory": "1Gi",
+                    "medusa.resources.requests.cpu": "250m",
+                    "medusa.resources.limits.cpu": "1",
+                })
+
             helm_install(name, store_ns, helm_values)  # Uses upgrade if deployed
 
             set_condition(conditions, "DriftDetected", "False", "Healed",

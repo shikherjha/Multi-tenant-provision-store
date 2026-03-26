@@ -18,17 +18,26 @@ postgres:
       memory: "256Mi"
 
 # --- Medusa Backend ---
+# Works with both lite (custom express) and full (real MedusaJS v2) images.
+# Adjust resources and probe timings based on the image:
+#   lite:  fast startup (~5s), low memory (~256Mi)
+#   full:  slow startup (~60-120s), high memory (~1Gi), needs migrations
 medusa:
   image: medusa-store:latest
   replicas: 1
   port: 9000
+  # Probe timings (overridable for full MedusaJS which has longer startup)
+  readinessInitialDelay: 30
+  livenessInitialDelay: 60
+  startupInitialDelay: 10
+  startupFailureThreshold: 30
   resources:
     requests:
-      cpu: "100m"
-      memory: "256Mi"
-    limits:
-      cpu: "500m"
+      cpu: "200m"
       memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
 
 # --- Storefront ---
 storefront:
@@ -37,11 +46,11 @@ storefront:
   port: 8000
   resources:
     requests:
-      cpu: "50m"
-      memory: "64Mi"
+      cpu: "100m"
+      memory: "256Mi"
     limits:
-      cpu: "200m"
-      memory: "128Mi"
+      cpu: "500m"
+      memory: "512Mi"
 
 # --- Ingress ---
 ingress:
@@ -69,7 +78,7 @@ limitRange:
   defaultRequestCpu: "100m"
   defaultRequestMemory: "128Mi"
   maxCpu: "1"
-  maxMemory: "1Gi"
+  maxMemory: "1536Mi"
 
 # --- Network Policy ---
 networkPolicy:
