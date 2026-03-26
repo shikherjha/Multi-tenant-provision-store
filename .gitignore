@@ -14,3 +14,6 @@ build/
 Thumbs.db
 *.swp
 *.swo
+
+helm.exe
+.claude/
