@@ -127,16 +127,22 @@ The activity log panel shows all events with timestamps.
 | GET | `/metrics` | Prometheus metrics |
 | GET | `/docs` | OpenAPI (Swagger) docs |
 
-## VPS / Production Setup (k3s)
+## VPS / Production Setup (k3s + NIP.IO + Cloudflare)
+
+The platform supports a production-ready edge architecture using NIP.IO, Cloudflare Tunnels, and R2 (S3-compatible) image storage. We provide scripts to automate provisioning on a fresh GCP VM.
 
 ```bash
-# On VPS: Install k3s
-curl -sfL https://get.k3s.io | sh -
+# 1. SSH into the GCP VM
+ssh <your-vm-ip>
 
-# Deploy with production values
-helm upgrade --install store-platform ./charts/store-platform \
-  -f ./charts/store-platform/values-prod.yaml \
-  --namespace store-platform --create-namespace
+# 2. Run the base setup script (installs k3s, Helm, cloudflared)
+./scripts/setup-vps.sh
+
+# 3. Authenticate and configure Cloudflare Tunnel (follow script instructions)
+# ... create tunnel, edit /etc/cloudflared/config.yml, start service
+
+# 4. Deploy the platform via Helm (auto-injects NIP.IO domain + R2 config)
+./scripts/deploy-prod.sh
 
 # What changes (via Helm values):
 # - Domain: *.yourvps.com (real DNS A records)

@@ -74,3 +74,11 @@ ingress:
 # --- NetworkPolicy (configurable ingress controller label) ---
 networkPolicy:
   ingressControllerLabel: "app.kubernetes.io/name: ingress-nginx"
+
+# --- Cloudflare R2 (image storage — disabled by default) ---
+r2:
+  enabled: false
+  accessKeyId: ""
+  secretAccessKey: ""
+  accountId: ""
+  bucket: "store-platform-media"

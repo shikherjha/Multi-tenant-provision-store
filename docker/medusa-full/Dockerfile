@@ -32,10 +32,10 @@ COPY medusa-config.ts /build/medusa-config.ts
 # Copy seed script
 COPY src/ /build/src/
 
-# Install deps (use whatever lockfile exists)
-RUN if [ -f "yarn.lock" ]; then yarn install; \
-    elif [ -f "pnpm-lock.yaml" ]; then pnpm install; \
-    else npm install --legacy-peer-deps; fi
+# Install deps (include S3 provider)
+RUN if [ -f "yarn.lock" ]; then yarn add @medusajs/file-s3 && yarn install; \
+    elif [ -f "pnpm-lock.yaml" ]; then pnpm add @medusajs/file-s3 && pnpm install; \
+    else npm install @medusajs/file-s3 --legacy-peer-deps && npm install --legacy-peer-deps; fi
 
 # Build production artifacts (.medusa/server)
 ENV NODE_OPTIONS=--max_old_space_size=4096

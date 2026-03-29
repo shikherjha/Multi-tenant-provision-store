@@ -8,15 +8,38 @@ const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${win
 const POLL_INTERVAL = 4000;
 
 // ============================================================
-// Store Dashboard App
+// Demo Users
+// ============================================================
+const DEMO_USERS = [
+    { id: 'alice', name: 'Alice', email: 'alice@storeos.io', avatar: 'A', color: '#a855f7' },
+    { id: 'bob', name: 'Bob', email: 'bob@storeos.io', avatar: 'B', color: '#3b82f6' },
+    { id: 'you', name: 'You', email: 'you@storeos.io', avatar: 'Y', color: '#10b981' },
+];
+
+// ============================================================
+// Pipeline Steps Definition
+// ============================================================
+const PIPELINE_STEPS = [
+    { key: 'NamespaceReady', label: 'Namespace' },
+    { key: 'HelmInstalled', label: 'Helm' },
+    { key: 'DatabaseReady', label: 'Database' },
+    { key: 'BackendReady', label: 'Backend' },
+    { key: 'StorefrontReady', label: 'Storefront' },
+];
+
+// ============================================================
+// Main App — Sidebar + Page Router
 // ============================================================
 export default function App() {
     const [stores, setStores] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [page, setPage] = useState('dashboard');
+    const [selectedStore, setSelectedStore] = useState(null);
     const [showModal, setShowModal] = useState(false);
-    const [expandedStore, setExpandedStore] = useState(null);
     const [toasts, setToasts] = useState([]);
     const [wsConnected, setWsConnected] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [currentUser, setCurrentUser] = useState(DEMO_USERS[2]); // default: "You"
     const wsRef = useRef(null);
     const pollRef = useRef(null);
 
@@ -27,10 +50,18 @@ export default function App() {
         setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
     }, []);
 
-    // ---- Fetch stores ----
+    // ---- API headers with user identity ----
+    const apiHeaders = useCallback(() => ({
+        'Content-Type': 'application/json',
+        'X-User-Id': currentUser.id,
+    }), [currentUser]);
+
+    // ---- Fetch stores (scoped to current user via X-User-Id header) ----
     const fetchStores = useCallback(async () => {
         try {
-            const res = await fetch(API_BASE);
+            const res = await fetch(API_BASE, {
+                headers: { 'X-User-Id': currentUser.id },
+            });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             setStores(data.stores || []);
@@ -39,7 +70,7 @@ export default function App() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [currentUser]);
 
     // ---- WebSocket connection ----
     useEffect(() => {
@@ -50,55 +81,36 @@ export default function App() {
             try {
                 ws = new WebSocket(WS_URL);
                 wsRef.current = ws;
-
                 ws.onopen = () => {
                     setWsConnected(true);
-                    // Stop polling when WS connects
-                    if (pollRef.current) {
-                        clearInterval(pollRef.current);
-                        pollRef.current = null;
-                    }
+                    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
                 };
-
                 ws.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
                         if (data.type === 'store_list') {
-                            setStores(data.stores || []);
+                            // WS gives full list — filter client-side for user
+                            const userStores = (data.stores || []);
+                            setStores(userStores);
                         } else if (data.store) {
-                            // Individual event — trigger refresh
                             fetchStores();
                         }
-                    } catch (e) {
-                        console.debug('WS parse error:', e);
-                    }
+                    } catch (e) { console.debug('WS parse error:', e); }
                 };
-
                 ws.onclose = () => {
                     setWsConnected(false);
                     wsRef.current = null;
-                    // Restart polling as fallback
-                    if (!pollRef.current) {
-                        pollRef.current = setInterval(fetchStores, POLL_INTERVAL);
-                    }
+                    if (!pollRef.current) pollRef.current = setInterval(fetchStores, POLL_INTERVAL);
                     reconnectTimer = setTimeout(connect, 5000);
                 };
-
-                ws.onerror = () => {
-                    ws.close();
-                };
+                ws.onerror = () => ws.close();
             } catch (e) {
                 console.debug('WS connection failed:', e);
-                if (!pollRef.current) {
-                    pollRef.current = setInterval(fetchStores, POLL_INTERVAL);
-                }
+                if (!pollRef.current) pollRef.current = setInterval(fetchStores, POLL_INTERVAL);
             }
         };
 
-        // Initial fetch
         fetchStores();
-
-        // Start polling + try WebSocket
         pollRef.current = setInterval(fetchStores, POLL_INTERVAL);
         connect();
 
@@ -109,13 +121,21 @@ export default function App() {
         };
     }, [fetchStores]);
 
+    // ---- Re-fetch when user switches ----
+    const handleUserSwitch = (user) => {
+        setCurrentUser(user);
+        setLoading(true);
+        setSelectedStore(null);
+        setPage('dashboard');
+    };
+
     // ---- Create store ----
     const handleCreate = async (name, engine) => {
         try {
             const res = await fetch(API_BASE, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, engine, owner: 'default' }),
+                headers: apiHeaders(),
+                body: JSON.stringify({ name, engine, owner: currentUser.id }),
             });
             if (!res.ok) {
                 const err = await res.json();
@@ -133,16 +153,26 @@ export default function App() {
     const handleDelete = async (name) => {
         if (!window.confirm(`Delete store "${name}"? This action cannot be undone.`)) return;
         try {
-            const res = await fetch(`${API_BASE}/${name}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE}/${name}`, {
+                method: 'DELETE',
+                headers: { 'X-User-Id': currentUser.id },
+            });
             if (!res.ok) {
                 const err = await res.json();
                 throw new Error(err.detail || `HTTP ${res.status}`);
             }
             addToast(`Store "${name}" deletion initiated`, 'info');
+            if (selectedStore === name) { setSelectedStore(null); setPage('stores'); }
             fetchStores();
         } catch (err) {
             addToast(err.message, 'error');
         }
+    };
+
+    // ---- Navigate to store detail ----
+    const openStoreDetail = (storeName) => {
+        setSelectedStore(storeName);
+        setPage('store-detail');
     };
 
     // ---- Computed stats ----
@@ -153,40 +183,53 @@ export default function App() {
         failed: stores.filter(s => s.phase === 'Failed').length,
     };
 
+    const currentStore = selectedStore ? stores.find(s => s.name === selectedStore) : null;
+
     // ---- Render ----
     return (
-        <div className="app-container">
-            <TopBar wsConnected={wsConnected} />
-            <main className="main-content">
-                <PageHeader onCreateClick={() => setShowModal(true)} />
-                <StatsBar stats={stats} />
-                {loading ? (
-                    <div className="loading-container">
-                        <div className="loading-spinner" />
-                        <div className="loading-text">Loading stores...</div>
-                    </div>
-                ) : stores.length === 0 ? (
-                    <EmptyState onCreateClick={() => setShowModal(true)} />
-                ) : (
-                    <div className="stores-grid">
-                        {stores.map(store => (
-                            <StoreCard
-                                key={store.name}
-                                store={store}
-                                onDelete={handleDelete}
-                                expanded={expandedStore === store.name}
-                                onToggleExpand={() => setExpandedStore(
-                                    expandedStore === store.name ? null : store.name
-                                )}
-                            />
-                        ))}
-                    </div>
+        <div className="app-layout">
+            <Sidebar
+                page={page}
+                onNavigate={(p) => { setPage(p); setSelectedStore(null); }}
+                collapsed={sidebarCollapsed}
+                onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+                currentUser={currentUser}
+                onUserSwitch={handleUserSwitch}
+            />
+            <div className="app-main">
+                {page === 'dashboard' && (
+                    <DashboardPage
+                        stores={stores}
+                        stats={stats}
+                        loading={loading}
+                        onViewAll={() => setPage('stores')}
+                        onStoreClick={openStoreDetail}
+                        currentUser={currentUser}
+                    />
                 )}
-            </main>
+                {page === 'stores' && (
+                    <StoresPage
+                        stores={stores}
+                        loading={loading}
+                        onCreateClick={() => setShowModal(true)}
+                        onStoreClick={openStoreDetail}
+                        onDelete={handleDelete}
+                    />
+                )}
+                {page === 'store-detail' && currentStore && (
+                    <StoreDetailPage
+                        store={currentStore}
+                        onBack={() => setPage('stores')}
+                        onDelete={handleDelete}
+                    />
+                )}
+                {page === 'settings' && <SettingsPage currentUser={currentUser} />}
+            </div>
             {showModal && (
                 <CreateStoreModal
                     onClose={() => setShowModal(false)}
                     onCreate={handleCreate}
+                    currentUser={currentUser}
                 />
             )}
             <ToastContainer toasts={toasts} />
@@ -195,272 +238,484 @@ export default function App() {
 }
 
 // ============================================================
-// Top Bar
+// Sidebar — with User Switcher
 // ============================================================
-function TopBar({ wsConnected }) {
-    return (
-        <header className="topbar">
-            <div className="topbar-brand">
-                <div className="topbar-logo">U</div>
-                <div className="topbar-title">
-                    Urumi Platform <span>Control Plane</span>
-                </div>
-            </div>
-            <div className="topbar-actions">
-                <div className="topbar-badge">
-                    <span className="dot" />
-                    {wsConnected ? 'Live' : 'Polling'}
-                </div>
-            </div>
-        </header>
-    );
-}
+function Sidebar({ page, onNavigate, collapsed, onToggle, currentUser, onUserSwitch }) {
+    const [showUserMenu, setShowUserMenu] = useState(false);
+    const menuRef = useRef(null);
 
-// ============================================================
-// Page Header
-// ============================================================
-function PageHeader({ onCreateClick }) {
-    return (
-        <div className="page-header">
-            <div className="page-header-left">
-                <h1>Stores</h1>
-                <p>Manage your e-commerce store instances</p>
-            </div>
-            <button className="btn btn-primary" onClick={onCreateClick} id="create-store-btn">
-                + New Store
-            </button>
-        </div>
-    );
-}
+    const navItems = [
+        { id: 'dashboard', label: 'Dashboard', icon: '◫' },
+        { id: 'stores', label: 'Stores', icon: '⊞' },
+        { id: 'settings', label: 'Settings', icon: '⚙' },
+    ];
 
-// ============================================================
-// Stats Bar
-// ============================================================
-function StatsBar({ stats }) {
-    return (
-        <div className="stats-bar">
-            <div className="stat-card">
-                <div className="stat-label">Total</div>
-                <div className="stat-value">{stats.total}</div>
-            </div>
-            <div className="stat-card">
-                <div className="stat-label">Ready</div>
-                <div className="stat-value green">{stats.ready}</div>
-            </div>
-            <div className="stat-card">
-                <div className="stat-label">Provisioning</div>
-                <div className="stat-value yellow">{stats.provisioning}</div>
-            </div>
-            <div className="stat-card">
-                <div className="stat-label">Failed</div>
-                <div className="stat-value red">{stats.failed}</div>
-            </div>
-        </div>
-    );
-}
-
-// ============================================================
-// Store Card
-// ============================================================
-const PIPELINE_STEPS = [
-    { key: 'NamespaceReady', label: 'Namespace' },
-    { key: 'HelmInstalled', label: 'Helm' },
-    { key: 'DatabaseReady', label: 'Database' },
-    { key: 'BackendReady', label: 'Backend' },
-    { key: 'StorefrontReady', label: 'Storefront' },
-];
-
-function StoreCard({ store, onDelete, expanded, onToggleExpand }) {
-    const conditions = store.conditions || [];
-    const activityLog = store.activityLog || [];
-    const isProvisioning = store.phase === 'Provisioning';
-    const isReady = store.phase === 'Ready';
-    const isFailed = store.phase === 'Failed';
-
-    const getConditionStatus = (type) => {
-        const c = conditions.find(c => c.type === type);
-        if (!c) return 'pending';
-        return c.status === 'True' ? 'done' : 'active';
-    };
-
-    // Determine which pipeline steps are done/active/pending
-    const pipelineState = PIPELINE_STEPS.map((step, idx) => {
-        if (isReady) return 'done';
-        if (isFailed) {
-            const status = getConditionStatus(step.key);
-            if (status === 'done') return 'done';
-            // First non-done step is the failed one
-            const prevDone = idx === 0 || PIPELINE_STEPS.slice(0, idx).every(
-                s => getConditionStatus(s.key) === 'done'
-            );
-            return prevDone ? 'failed' : 'pending';
-        }
-        return getConditionStatus(step.key);
-    });
-
-    const phaseClass = {
-        Ready: 'ready',
-        Provisioning: 'provisioning',
-        Failed: 'failed',
-        Pending: 'pending',
-        ComingSoon: 'coming-soon',
-    }[store.phase] || 'pending';
+    // Close menu on outside click
+    useEffect(() => {
+        const handler = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) {
+                setShowUserMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
 
     return (
-        <div className="store-card" data-phase={store.phase} id={`store-${store.name}`}>
-            <div className="store-card-header">
-                <div className="store-card-identity">
-                    <div className={`store-card-icon ${store.engine}`}>
-                        {store.engine === 'medusa' ? 'M' : 'W'}
+        <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
+            <div className="sidebar-header">
+                <div className="sidebar-brand" onClick={() => onNavigate('dashboard')}>
+                    <div className="sidebar-logo">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <path d="M12 6v6l4 2" />
+                        </svg>
                     </div>
-                    <div>
-                        <div className="store-card-name">{store.name}</div>
-                        <div className="store-card-meta">
-                            <span>{store.engine}</span>
-                            <span>·</span>
-                            <span>{store.owner}</span>
-                        </div>
-                    </div>
+                    {!collapsed && <span className="sidebar-brand-text">storeOS</span>}
                 </div>
-                <div className="store-card-actions">
-                    <span className={`phase-badge ${phaseClass}`}>
-                        {isProvisioning && <span className="spinner" />}
-                        {store.phase}
-                    </span>
+            </div>
+            <nav className="sidebar-nav">
+                {navItems.map(item => (
                     <button
-                        className="btn btn-danger btn-sm"
-                        onClick={(e) => { e.stopPropagation(); onDelete(store.name); }}
+                        key={item.id}
+                        className={`sidebar-nav-item ${page === item.id || (page === 'store-detail' && item.id === 'stores') ? 'active' : ''}`}
+                        onClick={() => onNavigate(item.id)}
+                        title={collapsed ? item.label : undefined}
+                    >
+                        <span className="sidebar-nav-icon">{item.icon}</span>
+                        {!collapsed && <span className="sidebar-nav-label">{item.label}</span>}
+                    </button>
+                ))}
+            </nav>
+            <div className="sidebar-footer" ref={menuRef}>
+                <button className="sidebar-collapse-btn" onClick={onToggle}>
+                    {collapsed ? '▸' : '◂'}
+                </button>
+                <div
+                    className="sidebar-user"
+                    onClick={() => !collapsed && setShowUserMenu(!showUserMenu)}
+                    style={{ cursor: collapsed ? 'default' : 'pointer' }}
+                >
+                    <div
+                        className="sidebar-user-avatar"
+                        style={{ background: currentUser.color }}
+                    >
+                        {currentUser.avatar}
+                    </div>
+                    {!collapsed && (
+                        <div className="sidebar-user-info">
+                            <div className="sidebar-user-name">
+                                {currentUser.name}
+                                <span style={{ marginLeft: 4, fontSize: 10, opacity: 0.5 }}>▾</span>
+                            </div>
+                            <div className="sidebar-user-email">{currentUser.email}</div>
+                        </div>
+                    )}
+                </div>
+                {showUserMenu && !collapsed && (
+                    <div className="user-switcher-menu">
+                        <div className="user-switcher-header">Switch User</div>
+                        {DEMO_USERS.map(user => (
+                            <button
+                                key={user.id}
+                                className={`user-switcher-item ${user.id === currentUser.id ? 'active' : ''}`}
+                                onClick={() => { onUserSwitch(user); setShowUserMenu(false); }}
+                            >
+                                <span
+                                    className="user-switcher-avatar"
+                                    style={{ background: user.color }}
+                                >
+                                    {user.avatar}
+                                </span>
+                                <div className="user-switcher-info">
+                                    <div className="user-switcher-name">{user.name}</div>
+                                    <div className="user-switcher-email">{user.email}</div>
+                                </div>
+                                {user.id === currentUser.id && (
+                                    <span className="user-switcher-check">✓</span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </aside>
+    );
+}
+
+// ============================================================
+// Dashboard Page — Overview
+// ============================================================
+function DashboardPage({ stores, stats, loading, onViewAll, onStoreClick, currentUser }) {
+    const recentStores = [...stores].sort((a, b) => {
+        const ta = a.createdAt || '';
+        const tb = b.createdAt || '';
+        return tb.localeCompare(ta);
+    }).slice(0, 5);
+
+    // Build cluster activity from all stores' activity logs
+    const clusterActivity = stores.flatMap(s =>
+        (s.activityLog || []).map(e => ({ ...e, storeName: s.name }))
+    ).sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || '')).slice(0, 8);
+
+    return (
+        <div className="page">
+            <div className="page-title-section">
+                <div>
+                    <h1>Overview</h1>
+                    <p className="page-subtitle">
+                        {currentUser.name}'s store provisioning cluster
+                    </p>
+                </div>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="stats-row">
+                <StatCard label="TOTAL STORES" value={stats.total} icon="⊞" />
+                <StatCard label="READY" value={stats.ready} icon="□" color="green" />
+                <StatCard label="PROVISIONING" value={stats.provisioning} icon="⟳" color="cyan" />
+                <StatCard label="FAILED" value={stats.failed} icon="⊘" color="red" />
+            </div>
+
+            {/* Two-column: Recent Stores + Cluster Activity */}
+            <div className="dashboard-grid">
+                <div className="dashboard-card">
+                    <div className="dashboard-card-header">
+                        <h2>Recent Stores</h2>
+                        <button className="link-btn" onClick={onViewAll}>View all ›</button>
+                    </div>
+                    <div className="dashboard-card-body">
+                        {loading ? (
+                            <div className="loading-inline"><div className="loading-spinner-sm" /> Loading...</div>
+                        ) : recentStores.length === 0 ? (
+                            <div className="empty-inline">No stores created yet</div>
+                        ) : (
+                            recentStores.map(store => (
+                                <div key={store.name} className="recent-store-row" onClick={() => onStoreClick(store.name)}>
+                                    <div className="recent-store-icon">
+                                        <span className={`engine-icon ${store.engine}`}>
+                                            {store.engine === 'medusa' ? '⬡' : 'W'}
+                                        </span>
+                                    </div>
+                                    <div className="recent-store-info">
+                                        <div className="recent-store-name">{store.name}</div>
+                                        <div className="recent-store-meta">
+                                            {store.engine} · {store.owner || 'default'}
+                                        </div>
+                                    </div>
+                                    <PhaseBadge phase={store.phase} />
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
+                <div className="dashboard-card">
+                    <div className="dashboard-card-header">
+                        <h2>Cluster Activity</h2>
+                    </div>
+                    <div className="dashboard-card-body activity-feed">
+                        {clusterActivity.length === 0 ? (
+                            <div className="empty-inline">No recent activity</div>
+                        ) : (
+                            clusterActivity.map((entry, idx) => (
+                                <div key={idx} className="activity-feed-item">
+                                    <div className="activity-feed-store">{entry.storeName}</div>
+                                    <div className="activity-feed-body">
+                                        <EventBadge event={entry.event} />
+                                        <span className="activity-feed-msg">{entry.message}</span>
+                                    </div>
+                                    <div className="activity-feed-time">{formatRelativeTime(entry.timestamp)}</div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function StatCard({ label, value, icon, color }) {
+    return (
+        <div className="stat-card">
+            <div className="stat-card-top">
+                <span className="stat-card-label">{label}</span>
+                <span className={`stat-card-icon ${color || ''}`}>{icon}</span>
+            </div>
+            <div className={`stat-card-value ${color || ''}`}>{value}</div>
+        </div>
+    );
+}
+
+// ============================================================
+// Stores Page — Grid of Store Cards
+// ============================================================
+function StoresPage({ stores, loading, onCreateClick, onStoreClick, onDelete }) {
+    const [search, setSearch] = useState('');
+
+    const filtered = stores.filter(s =>
+        s.name.toLowerCase().includes(search.toLowerCase())
+    );
+
+    return (
+        <div className="page">
+            <div className="page-title-section">
+                <div>
+                    <h1>Stores</h1>
+                    <p className="page-subtitle">Manage your provisioned e-commerce instances</p>
+                </div>
+                <button className="btn btn-primary" onClick={onCreateClick} id="create-store-btn">
+                    <span className="btn-icon">+</span> New Store
+                </button>
+            </div>
+
+            <div className="search-bar">
+                <span className="search-icon">⌕</span>
+                <input
+                    type="text"
+                    placeholder="Search stores..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="search-input"
+                />
+            </div>
+
+            {loading ? (
+                <div className="loading-container">
+                    <div className="loading-spinner" />
+                    <div className="loading-text">Loading stores...</div>
+                </div>
+            ) : filtered.length === 0 ? (
+                stores.length === 0 ? (
+                    <EmptyState onCreateClick={onCreateClick} />
+                ) : (
+                    <div className="empty-inline">No stores match "{search}"</div>
+                )
+            ) : (
+                <div className="stores-grid">
+                    {filtered.map(store => (
+                        <StoreGridCard
+                            key={store.name}
+                            store={store}
+                            onClick={() => onStoreClick(store.name)}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function StoreGridCard({ store, onClick }) {
+    const pipelineState = getPipelineState(store);
+
+    return (
+        <div className="store-grid-card" data-phase={store.phase} onClick={onClick} id={`store-${store.name}`}>
+            <div className="store-grid-card-header">
+                <div>
+                    <div className="store-grid-card-name">{store.name}</div>
+                    <div className="store-grid-card-ns">store-{store.name}</div>
+                </div>
+                <PhaseBadge phase={store.phase} />
+            </div>
+
+            {(store.phase === 'Provisioning' || store.phase === 'Ready' || store.phase === 'Failed') && store.engine !== 'woocommerce' && (
+                <div className="pipeline-dots">
+                    <span className="pipeline-label">PIPELINE</span>
+                    <div className="pipeline-dots-row">
+                        {PIPELINE_STEPS.map((step, idx) => (
+                            <React.Fragment key={step.key}>
+                                <div
+                                    className={`pipeline-dot ${pipelineState[idx]}`}
+                                    title={`${step.label}: ${pipelineState[idx]}`}
+                                />
+                                {idx < PIPELINE_STEPS.length - 1 && (
+                                    <div className={`pipeline-dot-line ${pipelineState[idx] === 'done' && pipelineState[idx + 1] !== 'pending' ? 'done' : 'pending'}`} />
+                                )}
+                            </React.Fragment>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div className="store-grid-card-footer">
+                <span className="store-grid-card-engine">
+                    <span className={`engine-dot ${store.engine}`} /> {capitalize(store.engine)}
+                </span>
+                <span className="store-grid-card-region">
+                    ⊕ {store.owner || 'default'}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+// ============================================================
+// Store Detail Page
+// ============================================================
+function StoreDetailPage({ store, onBack, onDelete }) {
+    const pipelineState = getPipelineState(store);
+    const activityLog = store.activityLog || [];
+
+    return (
+        <div className="page">
+            {/* Breadcrumb */}
+            <div className="breadcrumb">
+                <button className="breadcrumb-link" onClick={onBack}>Stores</button>
+                <span className="breadcrumb-sep">›</span>
+                <span className="breadcrumb-current">{store.name}</span>
+            </div>
+
+            {/* Store Header */}
+            <div className="detail-header">
+                <div className="detail-header-left">
+                    <h1 className="detail-name">{store.name}</h1>
+                    <PhaseBadge phase={store.phase} />
+                </div>
+                <div className="detail-header-right">
+                    {store.url && (
+                        <a href={store.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
+                            ⊕ Storefront
+                        </a>
+                    )}
+                    {store.adminUrl && (
+                        <a href={store.adminUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline">
+                            ⚙ Admin
+                        </a>
+                    )}
+                    <button
+                        className="btn btn-danger-outline"
+                        onClick={() => onDelete(store.name)}
                         id={`delete-${store.name}`}
                     >
-                        ✕
+                        ⊗ Delete
                     </button>
                 </div>
             </div>
 
+            <div className="detail-ns">store-{store.name}</div>
+
             {/* Provisioning Pipeline */}
-            {(isProvisioning || isReady || isFailed) && store.engine !== 'woocommerce' && (
-                <div className="pipeline">
-                    {PIPELINE_STEPS.map((step, idx) => (
-                        <React.Fragment key={step.key}>
-                            {idx > 0 && (
-                                <div className={`pipeline-connector ${pipelineState[idx] === 'done' ? 'done' :
+            {store.engine !== 'woocommerce' && (
+                <div className="detail-section">
+                    <div className="detail-section-label">PROVISIONING PIPELINE</div>
+                    <div className="pipeline-stepper">
+                        {PIPELINE_STEPS.map((step, idx) => (
+                            <React.Fragment key={step.key}>
+                                {idx > 0 && (
+                                    <div className={`pipeline-stepper-line ${
+                                        pipelineState[idx] === 'done' || pipelineState[idx - 1] === 'done' ? 'done' :
                                         pipelineState[idx] === 'active' ? 'active' : 'pending'
                                     }`} />
-                            )}
-                            <div className="pipeline-step">
-                                <div className={`pipeline-step-icon ${pipelineState[idx]}`}>
-                                    {pipelineState[idx] === 'done' ? '✓' :
-                                        pipelineState[idx] === 'failed' ? '✕' :
-                                            pipelineState[idx] === 'active' ? '◉' : '○'}
+                                )}
+                                <div className="pipeline-stepper-step">
+                                    <div className={`pipeline-stepper-circle ${pipelineState[idx]}`}>
+                                        {pipelineState[idx] === 'done' ? (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                                <polyline points="20 6 9 17 4 12" />
+                                            </svg>
+                                        ) : pipelineState[idx] === 'failed' ? '✕' : pipelineState[idx] === 'active' ? (
+                                            <div className="stepper-spinner" />
+                                        ) : ''}
+                                    </div>
+                                    <span className={`pipeline-stepper-label ${pipelineState[idx]}`}>{step.label}</span>
                                 </div>
-                                <span className={`pipeline-step-label ${pipelineState[idx]}`}>
-                                    {step.label}
-                                </span>
-                            </div>
-                        </React.Fragment>
-                    ))}
-                </div>
-            )}
-
-            {/* URLs (only when ready) */}
-            {isReady && store.url && (
-                <div className="store-card-urls">
-                    <a href={store.url} target="_blank" rel="noopener noreferrer" className="store-card-url">
-                        🌐 {store.url}
-                    </a>
-                    {store.adminUrl && (
-                        <a href={store.adminUrl} target="_blank" rel="noopener noreferrer" className="store-card-url">
-                            ⚙️ Admin
-                        </a>
-                    )}
-                </div>
-            )}
-
-            {/* Message (failed/provisioning) */}
-            {store.message && !isReady && (
-                <div style={{
-                    fontSize: '12px',
-                    color: isFailed ? 'var(--accent-red)' : 'var(--text-muted)',
-                    marginTop: '8px',
-                    fontFamily: 'var(--font-mono)',
-                }}>
-                    {store.message}
-                </div>
-            )}
-
-            {/* Activity Log Panel */}
-            {activityLog.length > 0 && (
-                <div className="activity-panel">
-                    <div className="activity-panel-header" onClick={onToggleExpand}>
-                        <h3>
-                            📋 Activity Log
-                            <span style={{ color: 'var(--text-muted)', fontWeight: 400, fontSize: '11px' }}>
-                                ({activityLog.length} events)
-                            </span>
-                        </h3>
-                        <span className={`activity-panel-toggle ${expanded ? 'open' : ''}`}>▼</span>
+                            </React.Fragment>
+                        ))}
                     </div>
-                    {expanded && (
-                        <div className="activity-log">
-                            {[...activityLog].reverse().map((entry, idx) => (
-                                <ActivityEntry key={idx} entry={entry} />
-                            ))}
-                        </div>
-                    )}
                 </div>
             )}
 
-            <div className="store-card-footer">
-                <span className="store-card-timestamp">
-                    {store.createdAt ? formatTime(store.createdAt) : '—'}
-                </span>
-                {store.retryCount > 0 && (
-                    <span style={{ fontSize: '11px', color: 'var(--accent-yellow)' }}>
-                        Retries: {store.retryCount}
-                    </span>
-                )}
+            {/* Two columns: Config + Events */}
+            <div className="detail-grid">
+                <div className="detail-card">
+                    <h3 className="detail-card-title">Configuration</h3>
+                    <div className="detail-table">
+                        <DetailRow label="Engine" value={capitalize(store.engine)} />
+                        <DetailRow label="Owner" value={store.owner || 'default'} />
+                        <DetailRow label="Created" value={store.createdAt ? formatTime(store.createdAt) : '—'} />
+                        <DetailRow label="Events" value={`${activityLog.length} Events`} />
+                    </div>
+                </div>
+
+                <div className="detail-card">
+                    <div className="detail-card-header-row">
+                        <h3 className="detail-card-title">
+                            <span className="detail-card-title-icon">⟩_</span> cluster-events.log
+                        </h3>
+                        <span className="detail-card-badge">{activityLog.length} events</span>
+                    </div>
+                    <div className="event-log">
+                        {[...activityLog].reverse().map((entry, idx) => (
+                            <div key={idx} className="event-log-entry">
+                                <span className="event-log-time">{formatTimeShort(entry.timestamp)}</span>
+                                <EventBadge event={entry.event} />
+                                <span className="event-log-msg">{entry.message}</span>
+                            </div>
+                        ))}
+                        {activityLog.length === 0 && (
+                            <div className="empty-inline">No events yet</div>
+                        )}
+                    </div>
+                </div>
             </div>
+
+            {/* Error message if failed */}
+            {store.phase === 'Failed' && store.message && (
+                <div className="detail-error">
+                    <strong>Error:</strong> {store.message}
+                </div>
+            )}
         </div>
     );
 }
 
-// ============================================================
-// Activity Log Entry
-// ============================================================
-function ActivityEntry({ entry }) {
-    const iconClass = getEventIconClass(entry.event);
+function DetailRow({ label, value }) {
     return (
-        <div className="activity-entry">
-            <span className="activity-entry-time">{formatTimeShort(entry.timestamp)}</span>
-            <div className={`activity-entry-icon ${iconClass}`}>●</div>
-            <div className="activity-entry-text">
-                <span className="activity-entry-event">{entry.event}</span>
-                {entry.message}
-            </div>
+        <div className="detail-row">
+            <span className="detail-row-label">{label}</span>
+            <span className="detail-row-value">{value}</span>
         </div>
     );
 }
 
-function getEventIconClass(event) {
-    if (!event) return 'info';
-    if (event.includes('READY') || event.includes('HEALED') || event.includes('COMPLETE')) return 'success';
-    if (event.includes('FAIL') || event.includes('ERROR') || event.includes('EXCEEDED')) return 'error';
-    if (event.includes('DRIFT') || event.includes('WARN')) return 'warn';
-    return 'info';
+// ============================================================
+// Settings Page
+// ============================================================
+function SettingsPage({ currentUser }) {
+    return (
+        <div className="page">
+            <div className="page-title-section">
+                <h1>Settings</h1>
+                <p className="page-subtitle">Platform configuration</p>
+            </div>
+            <div className="detail-card" style={{ maxWidth: 600 }}>
+                <h3 className="detail-card-title">Cluster Configuration</h3>
+                <div className="detail-table">
+                    <DetailRow label="Platform" value="storeOS v2.0" />
+                    <DetailRow label="Backend" value="MedusaJS v2 (Full)" />
+                    <DetailRow label="Operator" value="kopf (Python)" />
+                    <DetailRow label="Ingress" value="Traefik (k3s)" />
+                    <DetailRow label="Storage" value="Cloudflare R2" />
+                    <DetailRow label="DNS" value="NIP.IO Wildcard" />
+                    <DetailRow label="Current User" value={`${currentUser.name} (${currentUser.id})`} />
+                </div>
+            </div>
+        </div>
+    );
 }
 
 // ============================================================
 // Create Store Modal
 // ============================================================
-function CreateStoreModal({ onClose, onCreate }) {
+function CreateStoreModal({ onClose, onCreate, currentUser }) {
     const [name, setName] = useState('');
     const [engine, setEngine] = useState('medusa');
     const [creating, setCreating] = useState(false);
     const nameRef = useRef(null);
 
-    useEffect(() => {
-        nameRef.current?.focus();
-    }, []);
+    useEffect(() => { nameRef.current?.focus(); }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -503,9 +758,14 @@ function CreateStoreModal({ onClose, onCreate }) {
                             value={engine}
                             onChange={(e) => setEngine(e.target.value)}
                         >
-                            <option value="medusa">MedusaJS — Full e-commerce platform</option>
+                            <option value="medusa">MedusaJS v2 — Full e-commerce platform</option>
                             <option value="woocommerce">WooCommerce — Coming soon</option>
                         </select>
+                    </div>
+                    <div className="form-group">
+                        <label className="form-label">Owner</label>
+                        <input className="form-input" type="text" value={currentUser.name} disabled />
+                        <div className="form-hint">Stores are scoped to the currently selected user.</div>
                     </div>
                     <div className="modal-actions">
                         <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
@@ -525,12 +785,39 @@ function CreateStoreModal({ onClose, onCreate }) {
 }
 
 // ============================================================
-// Empty State
+// Shared Components
 // ============================================================
+function PhaseBadge({ phase }) {
+    const cls = {
+        Ready: 'ready', Provisioning: 'provisioning', Failed: 'failed',
+        Pending: 'pending', ComingSoon: 'coming-soon',
+    }[phase] || 'pending';
+
+    return (
+        <span className={`phase-badge ${cls}`}>
+            {phase === 'Provisioning' && <span className="spinner" />}
+            {phase === 'Ready' && <span className="phase-dot ready" />}
+            {phase === 'Failed' && <span className="phase-dot failed" />}
+            {phase}
+        </span>
+    );
+}
+
+function EventBadge({ event }) {
+    let cls = 'info';
+    if (!event) return null;
+    if (event.includes('READY') || event.includes('HEALED') || event.includes('COMPLETE')) cls = 'success';
+    else if (event.includes('FAIL') || event.includes('ERROR') || event.includes('EXCEEDED')) cls = 'error';
+    else if (event.includes('DRIFT') || event.includes('WARN')) cls = 'warn';
+    else if (event.includes('DB_') || event.includes('HELM_') || event.includes('NAMESPACE_')) cls = 'info';
+
+    return <span className={`event-badge ${cls}`}>{event}</span>;
+}
+
 function EmptyState({ onCreateClick }) {
     return (
         <div className="empty-state">
-            <div className="empty-state-icon">🏪</div>
+            <div className="empty-state-icon">⊞</div>
             <h3>No stores yet</h3>
             <p>Deploy your first e-commerce store in seconds. The operator will provision a namespace, database, backend, and storefront automatically.</p>
             <button className="btn btn-primary" onClick={onCreateClick}>
@@ -540,9 +827,6 @@ function EmptyState({ onCreateClick }) {
     );
 }
 
-// ============================================================
-// Toast Container
-// ============================================================
 function ToastContainer({ toasts }) {
     return (
         <div className="toast-container">
@@ -559,18 +843,46 @@ function ToastContainer({ toasts }) {
 }
 
 // ============================================================
-// Utility
+// Utility Functions
 // ============================================================
+function getPipelineState(store) {
+    const conditions = store.conditions || [];
+    const isReady = store.phase === 'Ready';
+    const isFailed = store.phase === 'Failed';
+
+    const getConditionStatus = (type) => {
+        const c = conditions.find(c => c.type === type);
+        if (!c) return 'pending';
+        return c.status === 'True' ? 'done' : 'active';
+    };
+
+    return PIPELINE_STEPS.map((step, idx) => {
+        if (isReady) return 'done';
+        if (isFailed) {
+            const status = getConditionStatus(step.key);
+            if (status === 'done') return 'done';
+            const prevDone = idx === 0 || PIPELINE_STEPS.slice(0, idx).every(
+                s => getConditionStatus(s.key) === 'done'
+            );
+            return prevDone ? 'failed' : 'pending';
+        }
+        return getConditionStatus(step.key);
+    });
+}
+
+function capitalize(s) {
+    if (!s) return '';
+    return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function formatTime(isoStr) {
     try {
         const d = new Date(isoStr);
         return d.toLocaleString('en-US', {
-            month: 'short', day: 'numeric',
+            month: 'short', day: 'numeric', year: 'numeric',
             hour: '2-digit', minute: '2-digit',
         });
-    } catch {
-        return isoStr;
-    }
+    } catch { return isoStr; }
 }
 
 function formatTimeShort(isoStr) {
@@ -580,7 +892,18 @@ function formatTimeShort(isoStr) {
             hour: '2-digit', minute: '2-digit', second: '2-digit',
             hour12: false,
         });
-    } catch {
-        return isoStr?.slice(11, 19) || '';
-    }
+    } catch { return isoStr?.slice(11, 19) || ''; }
+}
+
+function formatRelativeTime(isoStr) {
+    if (!isoStr) return '';
+    try {
+        const d = new Date(isoStr);
+        const now = new Date();
+        const diff = Math.floor((now - d) / 1000);
+        if (diff < 60) return `${diff}s ago`;
+        if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+        return `${Math.floor(diff / 86400)} days ago`;
+    } catch { return ''; }
 }

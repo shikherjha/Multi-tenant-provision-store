@@ -49,5 +49,15 @@ spec:
             - name: REDIS_URL
               value: "redis://redis.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.redis.port }}"
             {{- end }}
+            {{- if .Values.r2.enabled }}
+            - name: R2_ACCESS_KEY_ID
+              value: {{ .Values.r2.accessKeyId | quote }}
+            - name: R2_SECRET_ACCESS_KEY
+              value: {{ .Values.r2.secretAccessKey | quote }}
+            - name: R2_ACCOUNT_ID
+              value: {{ .Values.r2.accountId | quote }}
+            - name: R2_BUCKET
+              value: {{ .Values.r2.bucket | quote }}
+            {{- end }}
           resources:
             {{- toYaml .Values.operator.resources | nindent 12 }}

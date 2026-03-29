@@ -59,6 +59,12 @@ INGRESS_CLASS = os.environ.get("INGRESS_CLASS", "nginx")
 REDIS_URL = os.environ.get("REDIS_URL", "")
 MAX_PARALLEL_PROVISIONS = int(os.environ.get("MAX_PARALLEL_PROVISIONS", "3"))
 
+# Cloudflare R2 — passed through to per-store Helm values
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
+R2_BUCKET = os.environ.get("R2_BUCKET", "store-platform-media")
+
 CRD_GROUP = "platform.urumi.ai"
 CRD_VERSION = "v1"
 CRD_PLURAL = "stores"
@@ -574,6 +580,16 @@ def reconcile_store(spec, name, status, patch, logger, **kwargs):
             "postgres.storageClass": STORAGE_CLASS,
         }
 
+        # Inject R2 credentials if available
+        if R2_ACCESS_KEY_ID:
+            helm_values.update({
+                "r2.enabled": "true",
+                "r2.accessKeyId": R2_ACCESS_KEY_ID,
+                "r2.secretAccessKey": R2_SECRET_ACCESS_KEY,
+                "r2.accountId": R2_ACCOUNT_ID,
+                "r2.bucket": R2_BUCKET,
+            })
+
         # Full MedusaJS v2 needs longer startup (migrations + admin build + seed)
         is_full_medusa = "full" in MEDUSA_IMAGE.lower() or "medusajs" in MEDUSA_IMAGE.lower()
         if is_full_medusa:
@@ -799,6 +815,16 @@ def check_store_health(spec, name, status, patch, logger, **kwargs):
             "ingress.className": INGRESS_CLASS,
             "postgres.storageClass": STORAGE_CLASS,
             }
+
+            # Inject R2 credentials if available
+            if R2_ACCESS_KEY_ID:
+                helm_values.update({
+                    "r2.enabled": "true",
+                    "r2.accessKeyId": R2_ACCESS_KEY_ID,
+                    "r2.secretAccessKey": R2_SECRET_ACCESS_KEY,
+                    "r2.accountId": R2_ACCOUNT_ID,
+                    "r2.bucket": R2_BUCKET,
+                })
 
             # Full MedusaJS v2 needs longer startup (migrations + admin build + seed)
             is_full_medusa = "full" in MEDUSA_IMAGE.lower() or "medusajs" in MEDUSA_IMAGE.lower()

@@ -6,6 +6,13 @@ The platform follows a **declarative, intent-based architecture** where the Stor
 is the single source of truth. Users express *intent* ("create a MedusaJS store"), and
 the Kubernetes operator *reconciles* that intent into running infrastructure.
 
+### Production Edge Architecture
+For production deployments (e.g., GCP VPS running k3s), the platform utilizes:
+*   **Edge Routing:** Cloudflare Tunnel for secure, persistent public HTTPS access without exposing ports.
+*   **Domain Resolution:** NIP.IO for zero-config wildcard DNS `*.{PUBLIC_IP}.nip.io`, mapping each store automatically to the VPS.
+*   **Ingress:** Traefik (k3s default) parsing the `nip.io` hostnames and distributing traffic correctly.
+*   **Storage:** Cloudflare R2 (S3-compatible API) for scalable, per-store, isolated image storage, configured via injected environment variables in the Helm charts.
+
 ![Architecture](./component%20view.png)
 
 ## Component Responsibilities

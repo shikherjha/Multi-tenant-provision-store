@@ -1,26 +1,42 @@
-# Production overrides (VPS / k3s)
+# Production overrides (GCP VM / k3s + NIP.IO + Cloudflare Tunnel)
+# Usage: Replace YOUR_IP with your VM's public IP before deploying
+#   helm upgrade --install store-platform ./charts/store-platform \
+#     -n store-platform -f ./charts/store-platform/values-prod.yaml
 namespace: store-platform
 
 redis:
   enabled: true
 
 operator:
-  domainSuffix: "stores.yourvps.com"
-  storageClass: "local-path"          # k3s default
-  ingressClass: "traefik"             # k3s ships with Traefik
+  domainSuffix: "YOUR_IP.nip.io"   # Replace YOUR_IP with actual VM IP
+  storageClass: "local-path"        # k3s default
+  ingressClass: "traefik"           # k3s ships with Traefik
   maxStores: 50
   provisionTimeout: 600
   maxParallelProvisions: 3
-  medusaImage: "registry.yourvps.com/medusa-store:latest"
-  storefrontImage: "registry.yourvps.com/store-storefront:latest"
+  medusaImage: "medusa-store:full"
+  storefrontImage: "store-storefront:latest"
 
 api:
-  domainSuffix: "stores.yourvps.com"
+  domainSuffix: "YOUR_IP.nip.io"
   maxStoresPerOwner: 10
   maxStoresGlobal: 50
   rateLimit: "30/minute"
 
 ingress:
   className: "traefik"
-  dashboardHost: "dashboard.yourvps.com"
-  apiHost: "api.yourvps.com"
+  dashboardHost: "dashboard.YOUR_IP.nip.io"
+  apiHost: "api.YOUR_IP.nip.io"
+
+# --- NetworkPolicy ---
+networkPolicy:
+  ingressControllerLabel: "app.kubernetes.io/name: traefik"
+
+# --- Cloudflare R2 (image storage) ---
+# Set these from your .env or pass via --set
+r2:
+  enabled: true
+  accessKeyId: ""       # --set r2.accessKeyId=xxx
+  secretAccessKey: ""   # --set r2.secretAccessKey=xxx
+  accountId: ""         # --set r2.accountId=xxx
+  bucket: "store-platform-media"

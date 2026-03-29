@@ -62,23 +62,30 @@ echo ""
 echo "[5/5] Building dashboard image..."
 docker build -t store-dashboard:latest ./dashboard/
 
-echo ""
-echo "============================================"
-echo "  Loading Images into Kind Cluster"
-echo "============================================"
+# 5. Load Images into cluster (Optional — only if Kind is present)
+if command -v kind >/dev/null 2>&1; then
+  echo ""
+  echo "============================================"
+  echo "  Loading Images into Kind Cluster"
+  echo "============================================"
+  
+  IMAGES="store-storefront:latest store-operator:latest intent-api:latest store-dashboard:latest"
+  if [ "$BACKEND_MODE" = "full" ]; then
+    IMAGES="medusa-store:full medusa-store:latest $IMAGES"
+  else
+    IMAGES="medusa-store:lite medusa-store:latest $IMAGES"
+  fi
 
-IMAGES="store-storefront:latest store-operator:latest intent-api:latest store-dashboard:latest"
-
-if [ "$BACKEND_MODE" = "full" ]; then
-  IMAGES="medusa-store:full medusa-store:latest $IMAGES"
+  for img in $IMAGES; do
+    echo "Loading $img..."
+    kind load docker-image "$img" --name "$CLUSTER_NAME"
+  done
 else
-  IMAGES="medusa-store:lite medusa-store:latest $IMAGES"
+  echo ""
+  echo "WARN: 'kind' command not found. Skipping image load."
+  echo "If using K3s, the images built with Docker are already local."
+  echo "NOTE: K3s might need 'docker save | k3s ctr images import -' if not using Docker as the runtime."
 fi
-
-for img in $IMAGES; do
-  echo "Loading $img..."
-  kind load docker-image "$img" --name "$CLUSTER_NAME"
-done
 
 echo ""
 echo "============================================"

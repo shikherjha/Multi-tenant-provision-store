@@ -89,3 +89,11 @@ networkPolicy:
     app.kubernetes.io/name: ingress-nginx
   # For Traefik (k3s/prod), override with:
   #   app.kubernetes.io/name: traefik
+
+# --- Cloudflare R2 (S3-compatible image storage) ---
+r2:
+  enabled: false
+  accessKeyId: ""
+  secretAccessKey: ""
+  accountId: ""
+  bucket: "store-platform-media"

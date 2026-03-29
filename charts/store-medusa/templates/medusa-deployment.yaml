@@ -49,6 +49,18 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
+            - name: STORE_NAME
+              value: {{ .Values.storeName | quote }}
+            {{- if .Values.r2.enabled }}
+            - name: R2_ACCESS_KEY_ID
+              value: {{ .Values.r2.accessKeyId | quote }}
+            - name: R2_SECRET_ACCESS_KEY
+              value: {{ .Values.r2.secretAccessKey | quote }}
+            - name: R2_ACCOUNT_ID
+              value: {{ .Values.r2.accountId | quote }}
+            - name: R2_BUCKET
+              value: {{ .Values.r2.bucket | quote }}
+            {{- end }}
           resources:
             {{- toYaml .Values.medusa.resources | nindent 12 }}
           readinessProbe:
