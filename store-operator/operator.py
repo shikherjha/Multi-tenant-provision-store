@@ -578,6 +578,8 @@ def reconcile_store(spec, name, status, patch, logger, **kwargs):
             "ingress.host": f"{name}.{domain_suffix}",
             "ingress.className": INGRESS_CLASS,
             "postgres.storageClass": STORAGE_CLASS,
+            # NetworkPolicy: allow the correct ingress controller through
+            "networkPolicy.ingressControllerSelector.app\\.kubernetes\\.io/name": INGRESS_CLASS,
         }
 
         # Inject R2 credentials if available
