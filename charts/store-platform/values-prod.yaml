@@ -1,4 +1,4 @@
-# Production overrides (GCP VM / k3s + NIP.IO + Cloudflare Tunnel)
+# Production overrides (GCP VM / k3s + NIP.IO + Let's Encrypt TLS)
 # Usage: Replace YOUR_IP with your VM's public IP before deploying
 #   helm upgrade --install store-platform ./charts/store-platform \
 #     -n store-platform -f ./charts/store-platform/values-prod.yaml
@@ -27,6 +27,7 @@ ingress:
   className: "traefik"
   dashboardHost: "dashboard.YOUR_IP.nip.io"
   apiHost: "api.YOUR_IP.nip.io"
+  tls: true
 
 # --- NetworkPolicy ---
 networkPolicy:

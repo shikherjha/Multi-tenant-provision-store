@@ -8,6 +8,9 @@ metadata:
     {{- include "store-platform.labels" . | nindent 4 }}
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    {{- if .Values.ingress.tls }}
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    {{- end }}
 spec:
   ingressClassName: {{ .Values.ingress.className | quote }}
   rules:
@@ -33,4 +36,11 @@ spec:
                 name: intent-api
                 port:
                   number: {{ .Values.api.port }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.dashboardHost | quote }}
+        - {{ .Values.ingress.apiHost | quote }}
+      secretName: platform-tls
+  {{- end }}
 {{- end }}

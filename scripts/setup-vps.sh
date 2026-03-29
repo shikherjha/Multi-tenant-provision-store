@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# VPS Setup Script — GCP VM with k3s + Cloudflare Tunnel
+# VPS Setup Script — GCP VM with k3s + Let's Encrypt TLS
 # Run this ON your GCP VM after SSH-ing in
 # =============================================================================
 set -e
@@ -61,17 +61,39 @@ else
 fi
 echo "  Helm version: $(helm version --short)"
 
-# --- Step 5: Install cloudflared ---
+# --- Step 5: Install cert-manager (Let's Encrypt TLS) ---
 echo ""
-echo "[5/6] Installing cloudflared..."
-if command -v cloudflared &> /dev/null; then
-  echo "  cloudflared already installed, skipping..."
-else
-  wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
-  chmod +x cloudflared-linux-amd64
-  sudo mv cloudflared-linux-amd64 /usr/local/bin/cloudflared
-fi
-echo "  cloudflared version: $(cloudflared --version)"
+echo "[5/6] Installing cert-manager for automatic HTTPS..."
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.17.1/cert-manager.crds.yaml
+helm repo add jetstack https://charts.jetstack.io --force-update
+helm repo update
+helm upgrade --install cert-manager jetstack/cert-manager \
+  --namespace cert-manager --create-namespace \
+  --version v1.17.1 \
+  --wait --timeout 120s
+
+echo "  Waiting for cert-manager pods to be ready..."
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=cert-manager -n cert-manager --timeout=120s
+
+# Create ClusterIssuer for Let's Encrypt
+echo "  Creating Let's Encrypt ClusterIssuer..."
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@storeos.io
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+    - http01:
+        ingress:
+          class: traefik
+EOF
+echo "  ✓ cert-manager installed with Let's Encrypt issuer"
 
 # --- Step 6: Verify Traefik is running ---
 echo ""
@@ -83,34 +105,13 @@ echo "============================================"
 echo "  ✅ VPS Base Setup Complete"
 echo "============================================"
 echo ""
+echo "  Ports 80 and 443 must be open in GCP firewall."
+echo ""
 echo "  Next steps:"
+echo "    1. Build images:  BACKEND_MODE=full bash scripts/build-images.sh"
+echo "    2. Import images: see deploy guide"
+echo "    3. Deploy:        bash scripts/deploy-prod.sh"
 echo ""
-echo "  1. Create Cloudflare Tunnel:"
-echo "     cloudflared tunnel login"
-echo "     cloudflared tunnel create store-platform"
-echo "     cloudflared tunnel list  # note the tunnel ID"
-echo ""
-echo "  2. Configure tunnel (replace TUNNEL_ID):"
-echo "     sudo mkdir -p /etc/cloudflared"
-echo "     cat <<EOF | sudo tee /etc/cloudflared/config.yml"
-echo "tunnel: store-platform"
-echo "credentials-file: /root/.cloudflared/<TUNNEL_ID>.json"
-echo ""
-echo "ingress:"
-echo "  - hostname: \"dashboard.$PUBLIC_IP.nip.io\""
-echo "    service: http://localhost:80"
-echo "  - hostname: \"api.$PUBLIC_IP.nip.io\""
-echo "    service: http://localhost:80"
-echo "  - hostname: \"*.$PUBLIC_IP.nip.io\""
-echo "    service: http://localhost:80"
-echo "  - service: http_status:404"
-echo "EOF"
-echo ""
-echo "  3. Start tunnel as systemd service:"
-echo "     sudo cloudflared service install"
-echo "     sudo systemctl enable cloudflared"
-echo "     sudo systemctl start cloudflared"
-echo ""
-echo "  4. Deploy the platform:"
-echo "     ./scripts/deploy-prod.sh"
+echo "  Dashboard: https://dashboard.$PUBLIC_IP.nip.io"
+echo "  API:       https://api.$PUBLIC_IP.nip.io/docs"
 echo ""
