@@ -1,6 +1,6 @@
 #!/bin/bash
 # =============================================================================
-# Deploy Platform to Production (k3s + NIP.IO + R2)
+# Deploy Platform to Production (k3s + custom domain + R2)
 # Run this on your GCP VM after setup-vps.sh
 # =============================================================================
 set -e
@@ -8,12 +8,15 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Auto-detect public IP
-PUBLIC_IP=$(curl -s ifconfig.me)
+DOMAIN_SUFFIX="${DOMAIN_SUFFIX:-stores.storeos.in}"
+DASHBOARD_HOST="${DASHBOARD_HOST:-dashboard.storeos.in}"
+API_HOST="${API_HOST:-api.storeos.in}"
 
 echo "============================================"
 echo "  Deploying Store Platform (Production)"
-echo "  IP: $PUBLIC_IP"
+echo "  Store domains: *.$DOMAIN_SUFFIX"
+echo "  Dashboard:     $DASHBOARD_HOST"
+echo "  API:           $API_HOST"
 echo "============================================"
 
 cd "$PROJECT_DIR"
@@ -49,16 +52,16 @@ echo ""
 echo "[2/3] Creating platform namespace..."
 kubectl create namespace store-platform 2>/dev/null || echo "  Namespace already exists"
 
-# 3. Deploy platform via Helm with NIP.IO domains
+# 3. Deploy platform via Helm with production domains
 echo ""
 echo "[3/3] Installing/upgrading platform Helm chart..."
 helm upgrade --install store-platform ./charts/store-platform \
   -n store-platform \
   -f ./charts/store-platform/values-prod.yaml \
-  --set operator.domainSuffix="$PUBLIC_IP.nip.io" \
-  --set api.domainSuffix="$PUBLIC_IP.nip.io" \
-  --set ingress.dashboardHost="dashboard.$PUBLIC_IP.nip.io" \
-  --set ingress.apiHost="api.$PUBLIC_IP.nip.io" \
+  --set operator.domainSuffix="$DOMAIN_SUFFIX" \
+  --set api.domainSuffix="$DOMAIN_SUFFIX" \
+  --set ingress.dashboardHost="$DASHBOARD_HOST" \
+  --set ingress.apiHost="$API_HOST" \
   $R2_SET_ARGS \
   --wait --timeout 180s
 
@@ -67,14 +70,14 @@ echo "============================================"
 echo "  ✅ Platform Deployed!"
 echo "============================================"
 echo ""
-echo "  Dashboard: https://dashboard.$PUBLIC_IP.nip.io"
-echo "  API Docs:  https://api.$PUBLIC_IP.nip.io/docs"
-echo "  Metrics:   https://api.$PUBLIC_IP.nip.io/metrics"
+echo "  Dashboard: https://$DASHBOARD_HOST"
+echo "  API Docs:  https://$API_HOST/docs"
+echo "  Metrics:   https://$API_HOST/metrics"
 echo ""
 echo "  Create a test store:"
-echo "    curl -X POST https://api.$PUBLIC_IP.nip.io/api/stores \\"
+echo "    curl -X POST https://$API_HOST/api/stores \\"
 echo "      -H 'Content-Type: application/json' \\"
 echo "      -d '{\"name\": \"demo-store\", \"engine\": \"medusa\"}'"
 echo ""
-echo "  Store URL: https://demo-store.$PUBLIC_IP.nip.io"
+echo "  Store URL: https://demo-store.$DOMAIN_SUFFIX"
 echo ""

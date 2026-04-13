@@ -41,6 +41,8 @@ spec:
               value: {{ .Values.operator.storageClass | quote }}
             - name: INGRESS_CLASS
               value: {{ .Values.operator.ingressClass | quote }}
+            - name: STORE_TLS
+              value: {{ .Values.operator.storeTls | quote }}
             - name: HELM_CHART_PATH
               value: "/charts/store-medusa"
             - name: MAX_PARALLEL_PROVISIONS

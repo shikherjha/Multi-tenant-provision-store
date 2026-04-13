@@ -25,6 +25,7 @@ operator:
   storefrontImage: "store-storefront:latest"
   storageClass: "standard"
   ingressClass: "nginx"
+  storeTls: false
   maxParallelProvisions: 3
   resources:
     requests:

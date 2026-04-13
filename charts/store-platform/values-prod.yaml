@@ -1,5 +1,4 @@
-# Production overrides (GCP VM / k3s + NIP.IO + Let's Encrypt TLS)
-# Usage: Replace YOUR_IP with your VM's public IP before deploying
+# Production overrides (GCP VM / k3s + Cloudflare DNS + Let's Encrypt TLS)
 #   helm upgrade --install store-platform ./charts/store-platform \
 #     -n store-platform -f ./charts/store-platform/values-prod.yaml
 namespace: store-platform
@@ -8,9 +7,10 @@ redis:
   enabled: true
 
 operator:
-  domainSuffix: "YOUR_IP.nip.io"   # Replace YOUR_IP with actual VM IP
+  domainSuffix: "stores.storeos.in"
   storageClass: "local-path"        # k3s default
   ingressClass: "traefik"           # k3s ships with Traefik
+  storeTls: true
   maxStores: 50
   provisionTimeout: 600
   maxParallelProvisions: 3
@@ -18,15 +18,15 @@ operator:
   storefrontImage: "store-storefront:latest"
 
 api:
-  domainSuffix: "YOUR_IP.nip.io"
+  domainSuffix: "stores.storeos.in"
   maxStoresPerOwner: 10
   maxStoresGlobal: 50
   rateLimit: "30/minute"
 
 ingress:
   className: "traefik"
-  dashboardHost: "dashboard.YOUR_IP.nip.io"
-  apiHost: "api.YOUR_IP.nip.io"
+  dashboardHost: "dashboard.storeos.in"
+  apiHost: "api.storeos.in"
   tls: true
 
 # --- NetworkPolicy ---

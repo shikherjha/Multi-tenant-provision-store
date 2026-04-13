@@ -56,6 +56,7 @@ MEDUSA_IMAGE = os.environ.get("MEDUSA_IMAGE", "medusa-store:latest")
 STOREFRONT_IMAGE = os.environ.get("STOREFRONT_IMAGE", "store-storefront:latest")
 STORAGE_CLASS = os.environ.get("STORAGE_CLASS", "standard")
 INGRESS_CLASS = os.environ.get("INGRESS_CLASS", "nginx")
+STORE_TLS = os.environ.get("STORE_TLS", "false").lower() == "true"
 REDIS_URL = os.environ.get("REDIS_URL", "")
 MAX_PARALLEL_PROVISIONS = int(os.environ.get("MAX_PARALLEL_PROVISIONS", "3"))
 
@@ -577,6 +578,7 @@ def reconcile_store(spec, name, status, patch, logger, **kwargs):
             "storefront.image": STOREFRONT_IMAGE,
             "ingress.host": f"{name}.{domain_suffix}",
             "ingress.className": INGRESS_CLASS,
+            "ingress.tls": str(STORE_TLS).lower(),
             "postgres.storageClass": STORAGE_CLASS,
             # NetworkPolicy: allow the correct ingress controller through
             "networkPolicy.ingressControllerSelector.app\\.kubernetes\\.io/name": INGRESS_CLASS,
@@ -653,8 +655,9 @@ def reconcile_store(spec, name, status, patch, logger, **kwargs):
             raise kopf.TemporaryError(f"Storefront not ready: {sf_reason}", delay=15)
 
         # All ready — mark store as Ready
-        store_url = f"http://{name}.{domain_suffix}"
-        admin_url = f"http://{name}.{domain_suffix}/app"
+        url_scheme = "https" if STORE_TLS else "http"
+        store_url = f"{url_scheme}://{name}.{domain_suffix}"
+        admin_url = f"{url_scheme}://{name}.{domain_suffix}/app"
 
         logger.info(f"[{name}] ✓ Store Ready at {store_url}")
         patch.status["phase"] = "Ready"
@@ -815,7 +818,9 @@ def check_store_health(spec, name, status, patch, logger, **kwargs):
             "storefront.image": STOREFRONT_IMAGE,
             "ingress.host": f"{name}.{domain_suffix}",
             "ingress.className": INGRESS_CLASS,
+            "ingress.tls": str(STORE_TLS).lower(),
             "postgres.storageClass": STORAGE_CLASS,
+            "networkPolicy.ingressControllerSelector.app\\.kubernetes\\.io/name": INGRESS_CLASS,
             }
 
             # Inject R2 credentials if available
