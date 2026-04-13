@@ -52,6 +52,29 @@ spec:
         - port: 9000
           protocol: TCP
 ---
+# --- Allow ACME HTTP-01 challenges for cert-manager ---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-acme-http01-solver
+  labels:
+    {{- include "store-medusa.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              {{- toYaml .Values.networkPolicy.ingressControllerSelector | nindent 14 }}
+      ports:
+        - port: 8089
+          protocol: TCP
+---
 # --- Allow storefront → medusa-backend ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
