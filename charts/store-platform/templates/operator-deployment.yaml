@@ -60,6 +60,8 @@ spec:
               value: {{ .Values.r2.accountId | quote }}
             - name: R2_BUCKET
               value: {{ .Values.r2.bucket | quote }}
+            - name: R2_PUBLIC_URL
+              value: {{ .Values.r2.publicUrl | quote }}
             {{- end }}
           resources:
             {{- toYaml .Values.operator.resources | nindent 12 }}

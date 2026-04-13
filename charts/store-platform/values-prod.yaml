@@ -41,3 +41,4 @@ r2:
   secretAccessKey: ""   # --set r2.secretAccessKey=xxx
   accountId: ""         # --set r2.accountId=xxx
   bucket: "store-platform-media"
+  publicUrl: "https://media.storeos.in"

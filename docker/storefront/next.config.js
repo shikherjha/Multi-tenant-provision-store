@@ -56,6 +56,10 @@ const nextConfig = {
       // Cloudflare R2 public access
       {
         protocol: "https",
+        hostname: "media.storeos.in",
+      },
+      {
+        protocol: "https",
         hostname: "**.r2.dev",
       },
       {

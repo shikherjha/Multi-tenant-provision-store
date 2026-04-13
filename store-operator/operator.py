@@ -65,6 +65,7 @@ R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
 R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
 R2_BUCKET = os.environ.get("R2_BUCKET", "store-platform-media")
+R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", "")
 
 CRD_GROUP = "platform.urumi.ai"
 CRD_VERSION = "v1"
@@ -592,6 +593,7 @@ def reconcile_store(spec, name, status, patch, logger, **kwargs):
                 "r2.secretAccessKey": R2_SECRET_ACCESS_KEY,
                 "r2.accountId": R2_ACCOUNT_ID,
                 "r2.bucket": R2_BUCKET,
+                "r2.publicUrl": R2_PUBLIC_URL,
             })
 
         # Full MedusaJS v2 needs longer startup (migrations + admin build + seed)
@@ -831,6 +833,7 @@ def check_store_health(spec, name, status, patch, logger, **kwargs):
                     "r2.secretAccessKey": R2_SECRET_ACCESS_KEY,
                     "r2.accountId": R2_ACCOUNT_ID,
                     "r2.bucket": R2_BUCKET,
+                    "r2.publicUrl": R2_PUBLIC_URL,
                 })
 
             # Full MedusaJS v2 needs longer startup (migrations + admin build + seed)

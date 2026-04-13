@@ -83,3 +83,4 @@ r2:
   secretAccessKey: ""
   accountId: ""
   bucket: "store-platform-media"
+  publicUrl: ""

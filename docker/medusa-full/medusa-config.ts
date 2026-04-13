@@ -2,6 +2,8 @@ import { defineConfig, loadEnv } from "@medusajs/framework/utils";
 
 loadEnv(process.env.NODE_ENV || "production", process.cwd());
 
+const r2PublicUrl = process.env.R2_PUBLIC_URL?.replace(/\/$/, "");
+
 export default defineConfig({
     projectConfig: {
         databaseUrl: process.env.DATABASE_URL,
@@ -29,7 +31,7 @@ export default defineConfig({
                         resolve: "@medusajs/file-s3",
                         id: "r2",
                         options: {
-                            file_url: `https://pub-${process.env.R2_ACCOUNT_ID}.r2.dev`,
+                            file_url: r2PublicUrl,
                             access_key_id: process.env.R2_ACCESS_KEY_ID,
                             secret_access_key: process.env.R2_SECRET_ACCESS_KEY,
                             endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
