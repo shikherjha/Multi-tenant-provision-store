@@ -4,6 +4,8 @@ storeOS is a Kubernetes-native multi-tenant ecommerce provisioning platform. It 
 
 The current production target is a GCP VM running k3s with Traefik, cert-manager, wildcard DNS, and S3-compatible object storage for media.
 
+For the longer-term AI storefront and commerce direction, see [ROADMAP.md](./ROADMAP.md).
+
 ## Architecture
 
 ![Control Plane Architecture](./Control%20plane%20architecture.png)
