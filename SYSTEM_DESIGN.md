@@ -172,12 +172,12 @@ The current identity layer uses the `X-User-Id` HTTP header.
 
 It provides:
 
-- Multi-user store listing for demo users.
+- A stable MVP owner value while auth is still out of scope.
 - Per-user quota enforcement.
 - Simple audit context in CRD spec and labels.
 - A clean path to future JWT or identity provider integration.
 
-In production, this header should be set or validated by an auth layer, not trusted directly from arbitrary clients.
+The dashboard currently pins this owner to `you` to avoid demo-only user switching bugs. In production, this header should be set or validated by an auth layer, not trusted directly from arbitrary clients.
 
 ### 9. Observability
 

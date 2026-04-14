@@ -46,7 +46,7 @@ https://store-1.stores.example.com
 | Status Conditions | Granular conditions: NamespaceReady, HelmInstalled, DatabaseReady, BackendReady, StorefrontReady |
 | Activity Log | Ring buffer in CRD status with 15 events plus Redis Streams for real-time dashboard updates |
 | Concurrency Control | Max 3 parallel provisions, configurable through Helm |
-| Identity Layer | `X-User-Id` header for multi-user awareness and per-user quota enforcement |
+| Identity Layer | Temporary `X-User-Id` owner header pinned to `you` in the dashboard |
 | Prometheus Metrics | `/metrics` endpoint with `stores_created_total`, `provisioning_failures_total`, `stores_total{phase}` |
 | NetworkPolicy | Configurable ingress controller selector for ingress-nginx locally and Traefik in k3s |
 | WooCommerce Stub | Accepted by CRD, immediately marked ComingSoon, showing extensible engine architecture |
@@ -61,12 +61,11 @@ Store names are currently used as globally unique slugs:
 {store-slug}.stores.<your-domain>
 ```
 
-That means Alice and Bob cannot both create a store with the slug `store-1`. For demos, use unique slugs:
+For the current MVP demo, the dashboard uses a single owner named `you`. Store slugs should still be unique:
 
 ```text
 you-store-1
-alice-store-1
-bob-store-1
+you-store-2
 ```
 
 Long term, store display names should be separated from unique slugs.

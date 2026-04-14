@@ -8,13 +8,9 @@ const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${win
 const POLL_INTERVAL = 4000;
 
 // ============================================================
-// Demo Users
+// MVP Owner
 // ============================================================
-const DEMO_USERS = [
-    { id: 'alice', name: 'Alice', email: 'alice@storeos.io', avatar: 'A', color: '#a855f7' },
-    { id: 'bob', name: 'Bob', email: 'bob@storeos.io', avatar: 'B', color: '#3b82f6' },
-    { id: 'you', name: 'You', email: 'you@storeos.io', avatar: 'Y', color: '#10b981' },
-];
+const ACTIVE_USER = { id: 'you', name: 'You', email: 'you@storeos.io', avatar: 'Y', color: '#10b981' };
 
 // ============================================================
 // Pipeline Steps Definition
@@ -39,7 +35,6 @@ export default function App() {
     const [toasts, setToasts] = useState([]);
     const [wsConnected, setWsConnected] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-    const [currentUser, setCurrentUser] = useState(DEMO_USERS[2]); // default: "You"
     const wsRef = useRef(null);
     const pollRef = useRef(null);
 
@@ -53,14 +48,14 @@ export default function App() {
     // ---- API headers with user identity ----
     const apiHeaders = useCallback(() => ({
         'Content-Type': 'application/json',
-        'X-User-Id': currentUser.id,
-    }), [currentUser]);
+        'X-User-Id': ACTIVE_USER.id,
+    }), []);
 
-    // ---- Fetch stores (scoped to current user via X-User-Id header) ----
+    // ---- Fetch stores (scoped to the MVP owner via X-User-Id header) ----
     const fetchStores = useCallback(async () => {
         try {
             const res = await fetch(API_BASE, {
-                headers: { 'X-User-Id': currentUser.id },
+                headers: { 'X-User-Id': ACTIVE_USER.id },
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
@@ -70,7 +65,7 @@ export default function App() {
         } finally {
             setLoading(false);
         }
-    }, [currentUser]);
+    }, []);
 
     // ---- WebSocket connection ----
     useEffect(() => {
@@ -89,9 +84,7 @@ export default function App() {
                     try {
                         const data = JSON.parse(event.data);
                         if (data.type === 'store_list') {
-                            // WS gives full list — filter client-side for user
-                            const userStores = (data.stores || []);
-                            setStores(userStores);
+                            setStores(data.stores || []);
                         } else if (data.store) {
                             fetchStores();
                         }
@@ -121,21 +114,13 @@ export default function App() {
         };
     }, [fetchStores]);
 
-    // ---- Re-fetch when user switches ----
-    const handleUserSwitch = (user) => {
-        setCurrentUser(user);
-        setLoading(true);
-        setSelectedStore(null);
-        setPage('dashboard');
-    };
-
     // ---- Create store ----
     const handleCreate = async (name, engine) => {
         try {
             const res = await fetch(API_BASE, {
                 method: 'POST',
                 headers: apiHeaders(),
-                body: JSON.stringify({ name, engine, owner: currentUser.id }),
+                body: JSON.stringify({ name, engine, owner: ACTIVE_USER.id }),
             });
             if (!res.ok) {
                 const err = await res.json();
@@ -155,7 +140,7 @@ export default function App() {
         try {
             const res = await fetch(`${API_BASE}/${name}`, {
                 method: 'DELETE',
-                headers: { 'X-User-Id': currentUser.id },
+                headers: { 'X-User-Id': ACTIVE_USER.id },
             });
             if (!res.ok) {
                 const err = await res.json();
@@ -193,8 +178,7 @@ export default function App() {
                 onNavigate={(p) => { setPage(p); setSelectedStore(null); }}
                 collapsed={sidebarCollapsed}
                 onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-                currentUser={currentUser}
-                onUserSwitch={handleUserSwitch}
+                currentUser={ACTIVE_USER}
             />
             <div className="app-main">
                 {page === 'dashboard' && (
@@ -204,7 +188,6 @@ export default function App() {
                         loading={loading}
                         onViewAll={() => setPage('stores')}
                         onStoreClick={openStoreDetail}
-                        currentUser={currentUser}
                     />
                 )}
                 {page === 'stores' && (
@@ -223,13 +206,13 @@ export default function App() {
                         onDelete={handleDelete}
                     />
                 )}
-                {page === 'settings' && <SettingsPage currentUser={currentUser} />}
+                {page === 'settings' && <SettingsPage currentUser={ACTIVE_USER} />}
             </div>
             {showModal && (
                 <CreateStoreModal
                     onClose={() => setShowModal(false)}
                     onCreate={handleCreate}
-                    currentUser={currentUser}
+                    currentUser={ACTIVE_USER}
                 />
             )}
             <ToastContainer toasts={toasts} />
@@ -238,28 +221,14 @@ export default function App() {
 }
 
 // ============================================================
-// Sidebar — with User Switcher
+// Sidebar
 // ============================================================
-function Sidebar({ page, onNavigate, collapsed, onToggle, currentUser, onUserSwitch }) {
-    const [showUserMenu, setShowUserMenu] = useState(false);
-    const menuRef = useRef(null);
-
+function Sidebar({ page, onNavigate, collapsed, onToggle, currentUser }) {
     const navItems = [
-        { id: 'dashboard', label: 'Dashboard', icon: '◫' },
-        { id: 'stores', label: 'Stores', icon: '⊞' },
-        { id: 'settings', label: 'Settings', icon: '⚙' },
+        { id: 'dashboard', label: 'Dashboard', icon: 'D' },
+        { id: 'stores', label: 'Stores', icon: 'S' },
+        { id: 'settings', label: 'Settings', icon: 'G' },
     ];
-
-    // Close menu on outside click
-    useEffect(() => {
-        const handler = (e) => {
-            if (menuRef.current && !menuRef.current.contains(e.target)) {
-                setShowUserMenu(false);
-            }
-        };
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
 
     return (
         <aside className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
@@ -287,15 +256,11 @@ function Sidebar({ page, onNavigate, collapsed, onToggle, currentUser, onUserSwi
                     </button>
                 ))}
             </nav>
-            <div className="sidebar-footer" ref={menuRef}>
+            <div className="sidebar-footer">
                 <button className="sidebar-collapse-btn" onClick={onToggle}>
-                    {collapsed ? '▸' : '◂'}
+                    {collapsed ? '>' : '<'}
                 </button>
-                <div
-                    className="sidebar-user"
-                    onClick={() => !collapsed && setShowUserMenu(!showUserMenu)}
-                    style={{ cursor: collapsed ? 'default' : 'pointer' }}
-                >
+                <div className="sidebar-user">
                     <div
                         className="sidebar-user-avatar"
                         style={{ background: currentUser.color }}
@@ -304,49 +269,20 @@ function Sidebar({ page, onNavigate, collapsed, onToggle, currentUser, onUserSwi
                     </div>
                     {!collapsed && (
                         <div className="sidebar-user-info">
-                            <div className="sidebar-user-name">
-                                {currentUser.name}
-                                <span style={{ marginLeft: 4, fontSize: 10, opacity: 0.5 }}>▾</span>
-                            </div>
+                            <div className="sidebar-user-name">{currentUser.name}</div>
                             <div className="sidebar-user-email">{currentUser.email}</div>
                         </div>
                     )}
                 </div>
-                {showUserMenu && !collapsed && (
-                    <div className="user-switcher-menu">
-                        <div className="user-switcher-header">Switch User</div>
-                        {DEMO_USERS.map(user => (
-                            <button
-                                key={user.id}
-                                className={`user-switcher-item ${user.id === currentUser.id ? 'active' : ''}`}
-                                onClick={() => { onUserSwitch(user); setShowUserMenu(false); }}
-                            >
-                                <span
-                                    className="user-switcher-avatar"
-                                    style={{ background: user.color }}
-                                >
-                                    {user.avatar}
-                                </span>
-                                <div className="user-switcher-info">
-                                    <div className="user-switcher-name">{user.name}</div>
-                                    <div className="user-switcher-email">{user.email}</div>
-                                </div>
-                                {user.id === currentUser.id && (
-                                    <span className="user-switcher-check">✓</span>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                )}
             </div>
         </aside>
     );
 }
 
 // ============================================================
-// Dashboard Page — Overview
+// Dashboard Page
 // ============================================================
-function DashboardPage({ stores, stats, loading, onViewAll, onStoreClick, currentUser }) {
+function DashboardPage({ stores, stats, loading, onViewAll, onStoreClick }) {
     const recentStores = [...stores].sort((a, b) => {
         const ta = a.createdAt || '';
         const tb = b.createdAt || '';
@@ -364,7 +300,7 @@ function DashboardPage({ stores, stats, loading, onViewAll, onStoreClick, curren
                 <div>
                     <h1>Overview</h1>
                     <p className="page-subtitle">
-                        {currentUser.name}'s store provisioning cluster
+                        Your store provisioning cluster
                     </p>
                 </div>
             </div>
