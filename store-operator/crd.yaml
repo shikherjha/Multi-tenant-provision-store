@@ -1,11 +1,11 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: stores.platform.urumi.ai
+  name: stores.platform.storeos.in
   annotations:
     description: "Declarative store provisioning CRD for multi-tenant e-commerce platform"
 spec:
-  group: platform.urumi.ai
+  group: platform.storeos.in
   names:
     plural: stores
     singular: store
@@ -13,7 +13,7 @@ spec:
     shortNames:
       - st
     categories:
-      - urumi
+      - storeos
   scope: Cluster
   versions:
     - name: v1
@@ -38,7 +38,7 @@ spec:
                   description: "Engine version tag"
                 domainSuffix:
                   type: string
-                  default: "local.urumi"
+                  default: "local.storeos.test"
                   description: "Domain suffix for store URL"
                 owner:
                   type: string

@@ -1,19 +1,19 @@
 #!/bin/bash
 # =============================================================================
-# VPS Setup Script — GCP VM with k3s + Let's Encrypt TLS
+# VPS setup script for GCP VM with k3s and Let's Encrypt TLS
 # Run this ON your GCP VM after SSH-ing in
 # =============================================================================
 set -e
 
 echo "============================================"
-echo "  Store Platform — VPS Setup"
+echo "  storeOS VPS Setup"
 echo "============================================"
 
 # --- Step 1: Get public IP ---
 PUBLIC_IP=$(curl -s ifconfig.me)
 echo ""
 echo "[1/6] Detected public IP: $PUBLIC_IP"
-echo "  NIP.IO domains:"
+echo "  Legacy nip.io domains:"
 echo "    dashboard.$PUBLIC_IP.nip.io"
 echo "    api.$PUBLIC_IP.nip.io"
 echo "    *.${PUBLIC_IP}.nip.io (per-store)"
@@ -27,7 +27,7 @@ else
   echo "  Installing Docker..."
   curl -fsSL https://get.docker.com | sh
   sudo usermod -aG docker $USER
-  echo "  ✓ Docker installed (you may need to RE-LOGIN for group changes to take effect)"
+  echo "  Docker installed. You may need to re-login for group changes to take effect."
 fi
 
 # --- Step 3: Install k3s ---
@@ -93,7 +93,7 @@ spec:
         ingress:
           class: traefik
 EOF
-echo "  ✓ cert-manager installed with Let's Encrypt issuer"
+echo "  cert-manager installed with Let's Encrypt issuer"
 
 # --- Step 6: Verify Traefik is running ---
 echo ""
@@ -102,7 +102,7 @@ kubectl get svc -n kube-system traefik 2>/dev/null || echo "  WARN: Traefik not 
 
 echo ""
 echo "============================================"
-echo "  ✅ VPS Base Setup Complete"
+echo "  VPS base setup complete"
 echo "============================================"
 echo ""
 echo "  Ports 80 and 443 must be open in GCP firewall."
@@ -112,6 +112,6 @@ echo "    1. Build images:  BACKEND_MODE=full bash scripts/build-images.sh"
 echo "    2. Import images: see deploy guide"
 echo "    3. Deploy:        bash scripts/deploy-prod.sh"
 echo ""
-echo "  Dashboard: https://dashboard.$PUBLIC_IP.nip.io"
-echo "  API:       https://api.$PUBLIC_IP.nip.io/docs"
+echo "  Production dashboard: https://dashboard.storeos.in"
+echo "  Production API:       https://api.storeos.in/docs"
 echo ""

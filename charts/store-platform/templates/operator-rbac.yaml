@@ -14,7 +14,7 @@ metadata:
   name: store-operator
 rules:
   # Watch/manage Store CRDs
-  - apiGroups: ["platform.urumi.ai"]
+  - apiGroups: ["platform.storeos.in"]
     resources: ["stores", "stores/status"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # Manage namespaces for store isolation

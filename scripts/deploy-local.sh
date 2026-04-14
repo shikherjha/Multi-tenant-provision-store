@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "============================================"
-echo "  Deploying Store Platform (Local)"
+echo "  Deploying storeOS (Local)"
 echo "============================================"
 
 cd "$PROJECT_DIR"
@@ -15,7 +15,7 @@ cd "$PROJECT_DIR"
 echo ""
 echo "[1/3] Applying Store CRD..."
 kubectl apply -f store-operator/crd.yaml
-echo "  ✓ CRD applied"
+echo "  CRD applied"
 
 # 2. Create platform namespace
 echo ""
@@ -32,14 +32,14 @@ helm upgrade --install store-platform ./charts/store-platform \
 
 echo ""
 echo "============================================"
-echo "  ✅ Platform Deployed!"
+echo "  Platform Deployed"
 echo "============================================"
 echo ""
 echo "  Add to /etc/hosts (or C:\\Windows\\System32\\drivers\\etc\\hosts):"
-echo "    127.0.0.1  dashboard.local.urumi api.local.urumi"
+echo "    127.0.0.1  dashboard.127.0.0.1.nip.io api.127.0.0.1.nip.io"
 echo ""
-echo "  Dashboard: http://dashboard.local.urumi"
-echo "  API Docs:  http://api.local.urumi/docs"
+echo "  Dashboard: http://dashboard.127.0.0.1.nip.io"
+echo "  API Docs:  http://api.127.0.0.1.nip.io/docs"
 echo ""
 echo "  Or use port-forward for local development:"
 echo "    kubectl port-forward -n store-platform svc/intent-api 8080:8080"

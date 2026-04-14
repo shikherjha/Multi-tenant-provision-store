@@ -49,7 +49,7 @@ logger = logging.getLogger("store-operator")
 # Configuration (overridable via env for Helm values-local vs values-prod)
 # ---------------------------------------------------------------------------
 HELM_CHART_PATH = os.environ.get("HELM_CHART_PATH", "/charts/store-medusa")
-DOMAIN_SUFFIX = os.environ.get("DOMAIN_SUFFIX", "local.urumi")
+DOMAIN_SUFFIX = os.environ.get("DOMAIN_SUFFIX", "local.storeos.test")
 MAX_STORES = int(os.environ.get("MAX_STORES", "10"))
 PROVISION_TIMEOUT = int(os.environ.get("PROVISION_TIMEOUT", "300"))
 MEDUSA_IMAGE = os.environ.get("MEDUSA_IMAGE", "medusa-store:latest")
@@ -67,7 +67,7 @@ R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID", "")
 R2_BUCKET = os.environ.get("R2_BUCKET", "store-platform-media")
 R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL", "")
 
-CRD_GROUP = "platform.urumi.ai"
+CRD_GROUP = "platform.storeos.in"
 CRD_VERSION = "v1"
 CRD_PLURAL = "stores"
 
@@ -282,8 +282,8 @@ def ensure_namespace(name: str, store_name: str, engine: str) -> bool:
                     name=name,
                     labels={
                         "app.kubernetes.io/managed-by": "store-operator",
-                        "store.platform.urumi.ai/name": store_name,
-                        "store.platform.urumi.ai/engine": engine,
+                        "store.platform.storeos.in/name": store_name,
+                        "store.platform.storeos.in/engine": engine,
                     },
                 )
             )
@@ -474,9 +474,9 @@ def _check_pods_by_label(namespace: str, label_selector: str) -> tuple[bool, str
 @kopf.on.startup()
 def configure(settings: kopf.OperatorSettings, **kwargs):
     settings.posting.enabled = True
-    settings.persistence.finalizer = "stores.platform.urumi.ai/finalizer"
+    settings.persistence.finalizer = "stores.platform.storeos.in/finalizer"
     settings.persistence.progress_storage = kopf.AnnotationsProgressStorage(
-        prefix="platform.urumi.ai"
+        prefix="platform.storeos.in"
     )
     # Concurrency control: max 3 parallel store reconciliations
     settings.execution.max_workers = MAX_PARALLEL_PROVISIONS

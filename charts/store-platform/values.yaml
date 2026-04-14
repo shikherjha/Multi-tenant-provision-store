@@ -18,7 +18,7 @@ redis:
 operator:
   image: store-operator:latest
   replicas: 1
-  domainSuffix: "local.urumi"
+  domainSuffix: "local.storeos.test"
   maxStores: 10
   provisionTimeout: 300
   medusaImage: "medusa-store:latest"
@@ -40,7 +40,7 @@ api:
   image: intent-api:latest
   replicas: 1
   port: 8080
-  domainSuffix: "local.urumi"
+  domainSuffix: "local.storeos.test"
   maxStoresPerOwner: 5
   maxStoresGlobal: 10
   rateLimit: "10/minute"
@@ -69,14 +69,14 @@ dashboard:
 ingress:
   enabled: true
   className: "nginx"
-  dashboardHost: "dashboard.local.urumi"
-  apiHost: "api.local.urumi"
+  dashboardHost: "dashboard.local.storeos.test"
+  apiHost: "api.local.storeos.test"
 
 # --- NetworkPolicy (configurable ingress controller label) ---
 networkPolicy:
   ingressControllerLabel: "app.kubernetes.io/name: ingress-nginx"
 
-# --- Cloudflare R2 (image storage — disabled by default) ---
+# --- Cloudflare R2 (image storage, disabled by default) ---
 r2:
   enabled: false
   accessKeyId: ""

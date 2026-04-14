@@ -4,7 +4,7 @@ Common labels for all resources in a store namespace.
 {{- define "store-medusa.labels" -}}
 app.kubernetes.io/part-of: medusa-store
 app.kubernetes.io/managed-by: store-operator
-store.platform.urumi.ai/name: {{ .Values.storeName }}
+store.platform.storeos.in/name: {{ .Values.storeName }}
 {{- end }}
 
 {{/*

@@ -12,12 +12,12 @@ class Settings:
     IN_CLUSTER = os.environ.get("IN_CLUSTER", "false").lower() == "true"
 
     # --- CRD ---
-    CRD_GROUP = "platform.urumi.ai"
+    CRD_GROUP = "platform.storeos.in"
     CRD_VERSION = "v1"
     CRD_PLURAL = "stores"
 
     # --- Platform ---
-    DOMAIN_SUFFIX = os.environ.get("DOMAIN_SUFFIX", "local.urumi")
+    DOMAIN_SUFFIX = os.environ.get("DOMAIN_SUFFIX", "local.storeos.test")
 
     # --- Quotas ---
     MAX_STORES_PER_OWNER = int(os.environ.get("MAX_STORES_PER_OWNER", "5"))

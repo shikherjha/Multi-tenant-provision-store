@@ -5,7 +5,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-CLUSTER_NAME="${KIND_CLUSTER:-urumi-cluster}"
+CLUSTER_NAME="${KIND_CLUSTER:-storeos-cluster}"
 BACKEND_MODE="${BACKEND_MODE:-lite}"
 
 echo "============================================"
@@ -18,7 +18,7 @@ cd "$PROJECT_DIR"
 # 1. Build Medusa Store image (lite = custom express, full = real MedusaJS v2)
 echo ""
 if [ "$BACKEND_MODE" = "full" ]; then
-  echo "[1/5] Building medusa-store:full (Real MedusaJS v2 — this takes 5-10 minutes)..."
+  echo "[1/5] Building medusa-store:full (Real MedusaJS v2, this takes 5-10 minutes)..."
   docker build -t medusa-store:full ./docker/medusa-full/
   # Also tag as latest for Helm chart compatibility
   docker tag medusa-store:full medusa-store:latest
@@ -62,7 +62,7 @@ echo ""
 echo "[5/5] Building dashboard image..."
 docker build -t store-dashboard:latest ./dashboard/
 
-# 5. Load Images into cluster (Optional — only if Kind is present)
+# 5. Load images into cluster, only if Kind is present.
 if command -v kind >/dev/null 2>&1; then
   echo ""
   echo "============================================"
@@ -89,7 +89,7 @@ fi
 
 echo ""
 echo "============================================"
-echo "  ✅ All images built and loaded"
+echo "  All images built and loaded"
 echo "  Backend: $BACKEND_MODE"
 echo "============================================"
 echo ""

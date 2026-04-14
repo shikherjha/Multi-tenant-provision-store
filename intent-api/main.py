@@ -1,5 +1,5 @@
 """
-Store Provisioning Platform — Intent API
+storeOS Intent API
 
 Main entrypoint. Sets up FastAPI with:
   - CORS for dashboard access
@@ -37,15 +37,15 @@ logger = logging.getLogger("intent-api")
 # --- Lifespan ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Store Platform Intent API starting...")
+    logger.info("storeOS Intent API starting...")
     _init_metrics()
     yield
-    logger.info("Store Platform Intent API shutting down...")
+    logger.info("storeOS Intent API shutting down...")
 
 
 # --- FastAPI app ---
 app = FastAPI(
-    title="Store Provisioning Platform API",
+    title="storeOS API",
     description="Intent API for Kubernetes-native multi-tenant store provisioning",
     version="2.0.0",
     docs_url="/docs",

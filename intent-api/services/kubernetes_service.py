@@ -125,8 +125,8 @@ def create_store(name: str, engine: str, owner: str) -> StoreResponse:
         "metadata": {
             "name": name,
             "labels": {
-                "store.platform.urumi.ai/owner": owner,
-                "store.platform.urumi.ai/engine": engine,
+                "store.platform.storeos.in/owner": owner,
+                "store.platform.storeos.in/engine": engine,
             },
         },
         "spec": {

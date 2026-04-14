@@ -13,7 +13,7 @@ DASHBOARD_HOST="${DASHBOARD_HOST:-dashboard.storeos.in}"
 API_HOST="${API_HOST:-api.storeos.in}"
 
 echo "============================================"
-echo "  Deploying Store Platform (Production)"
+echo "  Deploying storeOS (Production)"
 echo "  Store domains: *.$DOMAIN_SUFFIX"
 echo "  Dashboard:     $DASHBOARD_HOST"
 echo "  API:           $API_HOST"
@@ -46,7 +46,7 @@ fi
 echo ""
 echo "[1/3] Applying Store CRD..."
 kubectl apply -f store-operator/crd.yaml
-echo "  ✓ CRD applied"
+echo "  CRD applied"
 
 # 2. Create platform namespace
 echo ""
@@ -68,7 +68,7 @@ helm upgrade --install store-platform ./charts/store-platform \
 
 echo ""
 echo "============================================"
-echo "  ✅ Platform Deployed!"
+echo "  Platform Deployed"
 echo "============================================"
 echo ""
 echo "  Dashboard: https://$DASHBOARD_HOST"
