@@ -1,90 +1,128 @@
-# System Design — Store Provisioning Platform
+# storeOS System Design
 
-## Architecture: Intent-Reconciling Operator Fabric
+## Goal
 
-The platform follows a **declarative, intent-based architecture** where the Store CRD
-is the single source of truth. Users express *intent* ("create a MedusaJS store"), and
-the Kubernetes operator *reconciles* that intent into running infrastructure.
+storeOS provisions isolated ecommerce stores from a single intent API. The current implementation uses Medusa v2 as the commerce engine, Kubernetes as the orchestration layer, and Cloudflare for DNS and media delivery.
 
-### Production Edge Architecture
-For production deployments (e.g., GCP VPS running k3s), the platform utilizes:
-*   **Edge Routing:** Cloudflare Tunnel for secure, persistent public HTTPS access without exposing ports.
-*   **Domain Resolution:** NIP.IO for zero-config wildcard DNS `*.{PUBLIC_IP}.nip.io`, mapping each store automatically to the VPS.
-*   **Ingress:** Traefik (k3s default) parsing the `nip.io` hostnames and distributing traffic correctly.
-*   **Storage:** Cloudflare R2 (S3-compatible API) for scalable, per-store, isolated image storage, configured via injected environment variables in the Helm charts.
+The long-term product direction is an LLM-operated ecommerce platform. The LLM should call structured tools to manage products, discounts, banners, layout configuration, orders, and store operations.
 
-![Architecture](./component%20view.png)
+## Component Architecture
 
-## Component Responsibilities
+![Component View](./component%20view.png)
 
-| Component | Role |
-|-----------|------|
-| **Dashboard** | React SPA with real-time provisioning pipeline, activity logs, WebSocket/polling |
-| **Intent API** | FastAPI — CRUD for Store CRDs, identity layer, rate limiting, Prometheus metrics |
-| **Store CRD** | Kubernetes Custom Resource — the plane of record for all store state |
-| **Operator** | kopf-based Python operator — watches CRDs, reconciles via Helm, drift detection |
-| **Redis** | Optional event bus — Redis Streams for activity log, PubSub for live dashboard updates |
-| **Medusa Chart** | Per-store Helm chart — PostgreSQL, Backend, Storefront, Ingress, NetworkPolicy |
 
-## Design Decisions & Rationale
 
-### 1. Why a CRD (not a database)?
+Each Medusa store namespace contains PostgreSQL, Medusa backend, Next.js storefront, Ingress, NetworkPolicy, ResourceQuota, and LimitRange.
 
-The CRD *is* the database. Kubernetes etcd provides:
-- **Consistency**: single-writer (operator) with optimistic concurrency via resourceVersion
-- **Durability**: etcd snapshots, WAL
-- **Watch semantics**: operator subscribes to changes without polling
-- **Declarative reconciliation**: the CRD spec describes *what*, not *how*
+## Production Edge
 
-No external database means fewer dependencies, no schema migrations, and the
-platform works identically on Kind, k3s, EKS, or GKE.
+| Concern | Current implementation |
+| --- | --- |
+| DNS | Cloudflare DNS for `storeos.in` |
+| Platform hosts | `dashboard.storeos.in`, `api.storeos.in` |
+| Store hosts | `*.stores.storeos.in` |
+| Ingress | Traefik from k3s |
+| TLS | cert-manager with Let's Encrypt HTTP-01 |
+| Media | Cloudflare R2 bucket with `media.storeos.in` |
+| Public product images | URLs generated from `R2_PUBLIC_URL` |
+
+The old `nip.io` deployment flow was useful before a real domain existed. It is now a legacy fallback for local or temporary environments. Production should use Cloudflare DNS and the `storeos.in` domain.
+
+## Store CRD
+
+The Store CRD is the control-plane source of truth.
+
+```yaml
+apiVersion: platform.storeos.in/v1
+kind: Store
+metadata:
+  name: you-store-1
+spec:
+  engine: medusa
+  owner: you
+  domainSuffix: stores.storeos.in
+```
+
+The CRD is cluster-scoped. Store names are currently global slugs and must be unique across all users.
+
+## Operator Responsibilities
+
+The operator is responsible for:
+
+```text
+Creating the store namespace
+Installing or upgrading the per-store Helm release
+Injecting production values such as Traefik, TLS, and R2
+Checking PostgreSQL, Medusa, and storefront readiness
+Updating Store status and activity log
+Deleting Helm releases and namespaces on store deletion
+Detecting resource drift and self-healing with Helm
+```
+
+The operator image bundles `charts/store-medusa`, so chart changes require rebuilding and importing `store-operator:latest`.
+
+## Design Decisions And Rationale
+
+### 1. Why A CRD Instead Of A Database
+
+The CRD is the platform database. Kubernetes etcd provides:
+
+- Consistency through resourceVersion and Kubernetes API concurrency control
+- Durability through etcd snapshots and write-ahead logs
+- Watch semantics so the operator reacts to changes without polling
+- Declarative reconciliation where the CRD spec describes what should exist
+
+No external platform database is required for the control plane. That reduces moving parts and keeps the platform portable across Kind, k3s, EKS, GKE, and similar Kubernetes environments.
 
 ### 2. Idempotency
 
-Every reconciliation step is idempotent:
-- `ensure_namespace()`: checks for 409 Conflict before creating
-- `helm_install()`: checks release status before install vs. upgrade
-- `create_store()`: returns existing store if name exists (no duplicates)
-- **Stuck release recovery**: detects `pending-install` / `failed` releases  
-  and cleans up before re-installing
+Every reconciliation step is designed to be safe to repeat:
+
+- `ensure_namespace()` checks for existing namespaces before creating.
+- Helm install logic checks release status before deciding install, upgrade, or cleanup.
+- Store creation returns the existing Store if the name already exists.
+- Stuck Helm release recovery detects `pending-install`, `pending-upgrade`, and `failed` releases before retrying.
+
+This is important because Kubernetes operators are expected to retry after restarts, API failures, and partial reconciliation.
 
 ### 3. Failure Handling
 
-**Transient errors** (network timeout, pod not ready): `kopf.TemporaryError` with
-exponential backoff. The operator retries up to 3 times, then marks as `Failed`.
+Transient failures, such as network timeout or pods not being ready yet, are treated with `kopf.TemporaryError` and retry backoff.
 
-**Permanent errors** (quota exceeded, invalid engine): immediate `Failed` status.
+Permanent failures, such as unsupported engine values or quota exhaustion, are reflected in Store status as Failed.
 
-**Operator restart**: `@kopf.on.resume` re-reconciles all non-Ready stores.
+Operator restart is handled through resume reconciliation. Non-ready stores are reconciled again when the operator comes back.
 
-**Stuck Helm releases**: operator detects `pending-install` / `pending-upgrade` / 
-`failed` states and cleans up before attempting fresh install.
+Stuck Helm releases are cleaned up before a fresh install or upgrade attempt. This prevents a store from staying permanently blocked in a Helm pending state.
 
 ### 4. Multi-Layered Isolation
 
 | Layer | Mechanism |
-|-------|-----------|
-| **Namespace** | `store-{name}` — blast radius containment |
-| **ResourceQuota** | CPU/memory/pod/PVC limits per namespace |
-| **LimitRange** | Default container resource requests/limits |
-| **NetworkPolicy** | Default-deny + explicit allows (ingress→app, app→db) |
-| **PodSecurityContext** | `runAsNonRoot`, `runAsUser: 1000` |
-| **RBAC** | Least-privilege ClusterRole for operator ServiceAccount |
+| --- | --- |
+| Namespace | `store-{name}` blast radius containment |
+| ResourceQuota | CPU, memory, pod, and PVC limits per namespace |
+| LimitRange | Default container requests and limits |
+| NetworkPolicy | Default-deny plus explicit allows for ingress, app, database, and ACME solver traffic |
+| PodSecurityContext | Non-root runtime settings where supported |
+| RBAC | Least-privilege ClusterRole for the operator ServiceAccount |
 
-### 5. Drift Detection & Self-Healing
+The isolation boundary is a Kubernetes namespace. This is simple enough for MVP while still giving a clean future path to stronger tenant isolation.
 
-The operator runs a **smart drift check** every 120 seconds for Ready stores:
+### 5. Drift Detection And Self-Healing
 
-1. Check if critical resources exist (Deployments, StatefulSet, Services)
-2. Check replica counts match expected
-3. **Only if drift detected** → trigger `helm upgrade` to restore
-4. No drift → just verify pod health
+The operator runs a smart drift check for Ready stores.
 
-This avoids blind `helm upgrade` calls that cause unnecessary pod restarts.
+It checks:
 
-### 6. Status Conditions (Granular)
+- Critical deployments, statefulsets, and services exist.
+- Replica counts match expected values.
+- Pods are healthy enough to keep status current.
 
-Instead of a single `phase: Provisioning`, the operator reports granular conditions:
+Only if drift is detected does the operator trigger Helm upgrade to restore missing or damaged resources. If there is no drift, it avoids unnecessary Helm calls and does not restart healthy pods.
+
+### 6. Status Conditions
+
+Instead of reporting only `phase: Provisioning`, the operator reports granular conditions:
 
 ```yaml
 status:
@@ -93,7 +131,7 @@ status:
     - type: NamespaceReady
       status: "True"
       reason: Created
-    - type: HelmInstalled  
+    - type: HelmInstalled
       status: "True"
       reason: Installed
     - type: DatabaseReady
@@ -107,102 +145,196 @@ status:
       status: "False"
       reason: NotReady
   activityLog:
-    - timestamp: "2024-01-15T10:30:00Z"
+    - timestamp: "2026-04-14T10:30:00Z"
       event: PROVISIONING_START
       message: "Store provisioning started"
-    - timestamp: "2024-01-15T10:30:05Z"
+    - timestamp: "2026-04-14T10:30:05Z"
       event: NAMESPACE_READY
       message: "Namespace store-myshop ready"
 ```
 
-The dashboard renders these as a **provisioning pipeline** — a visual step-by-step
-indicator similar to Railway or Vercel's build logs.
+The dashboard renders these conditions as a provisioning pipeline. This gives the user an understandable step-by-step view instead of a single opaque status.
 
-### 7. Activity Log (Ring Buffer)
+### 7. Activity Log
 
-Each store maintains a **ring buffer** of the last 15 events in CRD status.
-This is a deliberate design choice:
+Each store maintains a ring buffer of the last 15 events in CRD status.
 
-- **CRD status** (always available, no external dependency)
-- **Redis Streams** (optional, for real-time streaming to dashboard)
-- **etcd size limit** respected by capping at 15 entries
+The design has two event paths:
 
-Events are pushed to both channels simultaneously. The dashboard reads from
-CRD status on initial load, then subscribes to Redis Streams for live updates.
+- CRD status for always-available store history.
+- Redis Streams and PubSub for real-time dashboard updates.
 
-### 8. Identity Layer (X-User-Id)
+The CRD ring buffer avoids unbounded etcd growth. Redis gives a smoother live UI without becoming a hard dependency for core reconciliation.
 
-A lightweight identity mechanism using the `X-User-Id` HTTP header:
+### 8. Identity Layer
 
-- No full auth system (would be over-engineering for this scope)
-- Scopes store listings to the requesting user
-- Enforces per-user quotas (abuse prevention)
-- Logged in audit trail for accountability
+The current identity layer uses the `X-User-Id` HTTP header.
 
-The header is set by the reverse proxy or dashboard. In production, this would
-be replaced by JWT validation from an IdP.
+It provides:
+
+- Multi-user store listing for demo users.
+- Per-user quota enforcement.
+- Simple audit context in CRD spec and labels.
+- A clean path to future JWT or identity provider integration.
+
+In production, this header should be set or validated by an auth layer, not trusted directly from arbitrary clients.
 
 ### 9. Observability
 
 | Signal | Mechanism |
-|--------|-----------|
-| **Metrics** | Prometheus `/metrics` — `stores_created_total`, `provisioning_failures_total`, `stores_total{phase}` |
-| **Logs** | Structured logging in operator and API |
-| **Events** | Kubernetes Events (kopf) + Redis Streams |
-| **Activity Log** | CRD status ring buffer + Redis Streams |
+| --- | --- |
+| Metrics | Prometheus `/metrics` endpoint |
+| Logs | Structured logs in API and operator |
+| Events | Kubernetes Events from kopf plus Redis Streams |
+| Activity Log | CRD status ring buffer plus Redis Streams |
+
+Key metrics include:
+
+```text
+stores_created_total
+provisioning_failures_total
+stores_total{phase}
+```
 
 ### 10. Concurrency Control
 
-The operator limits concurrent reconciliations to **3 workers** (`max_workers=3`).
-This prevents resource exhaustion when many stores are created simultaneously.
+The operator limits concurrent reconciliations to 3 workers by default. This prevents resource exhaustion when many stores are created at the same time.
 
-## Security
+The limit is configurable through Helm values.
 
-### No Hardcoded Secrets
-All secrets are managed via Helm values and Kubernetes Secrets.
-PostgreSQL credentials are generated per-store and stored in namespace-scoped Secrets.
+## Store Networking
 
-### Rate Limiting
-The Intent API uses `slowapi` for IP-based rate limiting.
-Default: 10 requests/minute (configurable per environment).
+Each store namespace has a default-deny ingress policy. Explicit policies allow:
 
-### Network Policies
-Default-deny with explicit allows. The ingress controller selector is
-**configurable** via Helm values:
-- **Kind/local**: `app.kubernetes.io/name: ingress-nginx`
-- **k3s/production**: `app.kubernetes.io/name: traefik`
+```text
+Traefik to storefront and Medusa backend
+Storefront to Medusa backend
+Medusa backend to PostgreSQL
+Traefik to cert-manager HTTP-01 solver pods
+```
 
-No template changes needed — only values file changes.
+The cert-manager solver exception is required because HTTP-01 validation creates temporary solver pods in the store namespace. Without this policy, Let's Encrypt challenges can remain pending.
 
-## Local → Production Portability
+The ingress controller selector is configurable through Helm values:
 
-| Setting | Local (Kind) | Production (k3s) |
-|---------|-------------|-------------------|
-| Storage Class | `standard` | `local-path` |
-| Ingress Class | `nginx` | `traefik` |
-| Domain | `*.local.urumi` | `*.stores.yourvps.com` |
-| TLS | None | cert-manager |
-| Images | Docker load | Registry push |
-| Redis | Sidecar | Same (or external) |
-| NetworkPolicy selector | `ingress-nginx` | `traefik` |
+| Environment | Selector |
+| --- | --- |
+| Kind local | `app.kubernetes.io/name: ingress-nginx` |
+| k3s production | `app.kubernetes.io/name: traefik` |
 
-All differences are managed through `values-local.yaml` vs `values-prod.yaml`.
-The Helm charts and operator code are **identical** across environments.
+## TLS Flow
+
+1. Store Helm chart creates an Ingress with `cert-manager.io/cluster-issuer`.
+2. The Ingress includes a TLS block and `secretName`.
+3. cert-manager ingress-shim creates a Certificate.
+4. Let's Encrypt validates the HTTP-01 challenge through Traefik.
+5. cert-manager writes the certificate to the store namespace.
+6. Traefik serves the store with the issued certificate.
+
+## R2 Media Flow
+
+The Medusa backend uses the S3-compatible R2 endpoint for uploads:
+
+```text
+https://<account_id>.r2.cloudflarestorage.com
+```
+
+Public URLs use the custom R2 domain:
+
+```text
+https://media.storeos.in
+```
+
+These two URLs must not be confused. The public URL should come from `R2_PUBLIC_URL`, not from the R2 account ID.
+
+## Storefront Customization Direction
+
+The current storefront is based on the Medusa Next.js starter. It is a normal Next.js React app and can be replaced or customized.
+
+For an LLM-operated platform, the recommended model is a config-driven storefront renderer:
+
+```text
+One shared storefront codebase
+Per-store theme and page configuration
+LLM updates structured config through safe backend tools
+Frontend renders sections from config
+```
+
+The LLM should not write arbitrary React code for each store in the MVP. It should call tools such as:
+
+```text
+update_theme
+update_homepage_sections
+create_banner
+feature_collection
+create_discount
+update_navigation
+```
+
+This gives different stores different UI without duplicating the codebase.
 
 ## WooCommerce Stubbing
 
-The WooCommerce engine is deliberately stubbed:
-- CRD accepts `engine: woocommerce`
-- Operator immediately sets `phase: ComingSoon` without provisioning
-- Dashboard shows the store with a "Coming Soon" badge
-- This demonstrates extensible engine architecture without incomplete implementation
+WooCommerce is deliberately stubbed:
+
+- The CRD accepts `engine: woocommerce`.
+- The operator sets the store to ComingSoon without provisioning.
+- The dashboard can show the store as a future engine.
+- The API and CRD shape demonstrate how another commerce engine can plug in later.
+
+The intended long-term shape is an adapter layer:
+
+```text
+CommerceAdapter
+  create_product
+  update_product
+  create_discount
+  list_orders
+  update_inventory
+  upload_media
+
+MedusaAdapter
+WooCommerceAdapter
+```
+
+The storefront renderer should remain engine-agnostic where possible.
+
+## Security
+
+This repo should not contain production secrets. `.env` is ignored and should remain VM-local.
+
+Known MVP risks:
+
+| Risk | Current state | Recommended fix |
+| --- | --- | --- |
+| Hardcoded Medusa admin user | `admin@medusa-store.com` and `supersecret` in startup scripts | Generate per-store admin credentials and store in Kubernetes Secrets |
+| Demo JWT and cookie fallback secrets | Defaults exist in Medusa config | Require explicit secrets in Helm values |
+| Shared publishable key token | `pk_dummy` for storefront simplicity | Generate and inject a per-store publishable key |
+| R2 credentials in env vars | Passed through Helm values into deployments | Move to Kubernetes Secrets or External Secrets |
+| CORS is open | `STORE_CORS`, `ADMIN_CORS`, and `AUTH_CORS` default to `*` | Restrict to store and platform hosts |
+| Public media | Product media is public through R2 | Expected for ecommerce product images |
+
+## Local To Production Portability
+
+| Setting | Local | Production |
+| --- | --- | --- |
+| Cluster | Kind | k3s on GCP VM |
+| StorageClass | `standard` | `local-path` |
+| Ingress | ingress-nginx | Traefik |
+| Domain | `127.0.0.1.nip.io` | `storeos.in` |
+| TLS | optional | cert-manager |
+| Images | Docker load into Kind | Docker import into k3s containerd today, registry later |
+| Redis | In-cluster Redis | In-cluster Redis or external Redis later |
+| Media | local or R2 | Cloudflare R2 |
+
+All environment-specific choices should live in Helm values or VM-local `.env`, not hardcoded code.
 
 ## Horizontal Scaling Plan
 
 | Component | Strategy |
-|-----------|----------|
-| Operator | Single leader (kopf leader election via Lease) |
-| Intent API | Stateless — scale replicas, no session affinity needed |
-| Dashboard | Static — CDN/Nginx, infinite horizontal scale |
-| Redis | Sentinel/Cluster for HA (beyond current scope) |
-| Per-Store | Independent namespaces — natural isolation boundary |
+| --- | --- |
+| Operator | Single active reconciler with future leader election through Lease |
+| Intent API | Stateless replicas behind the platform Ingress |
+| Dashboard | Static frontend, can move to CDN or Vercel later |
+| Redis | Redis Sentinel, Redis Cluster, or managed Redis later |
+| Per-store workloads | Independent namespaces give natural scale and isolation boundaries |
